@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tactile Sensor Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Custom Scrollbar for Logs */
+        .log-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .log-scroll::-webkit-scrollbar-track {
+            background: #1f2937; 
+        }
+        .log-scroll::-webkit-scrollbar-thumb {
+            background: #4b5563; 
+            border-radius: 3px;
+        }
+        
+        canvas {
+            image-rendering: pixelated; /* Crucial for sharp grid rendering */
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-200 h-screen flex flex-col font-sans overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-slate-800 border-b border-slate-700 p-3 shadow-lg shrink-0 z-10">
+        <div class="max-w-full mx-auto flex flex-col md:flex-row justify-between items-center gap-4 px-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 p-2 rounded-lg shadow-lg shadow-indigo-900/50">
+                    <i class="fa-solid fa-layer-group text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-white tracking-wide">Tactile Visualizer</h1>
+                    <p class="text-xs text-slate-400">Binary Protocol Parser</p>
+                </div>
+            </div>
+
+            <div id="support-banner" class="hidden px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/50">
+                Web Serial Not Supported
+            </div>
+            
+            <div class="flex items-center gap-4">
+                 <!-- Stats -->
+                <div class="flex gap-4 text-xs font-mono text-slate-400 bg-slate-900/50 p-1.5 rounded-lg border border-slate-700/50">
+                    <div>FPS: <span id="fps-counter" class="text-indigo-400">0</span></div>
+                    <div>Pkts: <span id="packet-counter" class="text-indigo-400">0</span></div>
+                    <div>Max Val: <span id="max-val-display" class="text-indigo-400">0</span></div>
+                </div>
+
+                <!-- Connection Status -->
+                <div class="flex items-center gap-2 border-l border-slate-700 pl-4">
+                    <div class="flex flex-col items-end">
+                        <span id="connection-status" class="text-sm font-medium text-slate-500">Disconnected</span>
+                    </div>
+                    <div id="status-dot" class="w-3 h-3 rounded-full bg-slate-600 shadow-[0_0_8px_rgba(75,85,99,0.6)]"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col md:flex-row w-full overflow-hidden">
+        
+        <!-- Sidebar Controls -->
+        <aside class="w-full md:w-72 bg-slate-800 border-r border-slate-700 flex flex-col z-20 shadow-xl overflow-y-auto">
+            <div class="p-4 space-y-6">
+                
+                <!-- Connection Panel -->
+                <div class="space-y-3">
+                    <h2 class="text-xs uppercase text-slate-500 font-bold tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-plug text-slate-600"></i> Connection
+                    </h2>
+                    
+                    <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 space-y-3">
+                        <div>
+                            <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1">Baud Rate</label>
+                            <div class="relative">
+                                <select id="baud-rate" class="w-full bg-slate-800 border border-slate-600 text-white text-xs rounded p-2 focus:border-indigo-500 outline-none appearance-none">
+                                    <option value="9600">9600</option>
+                                    <option value="115200">115200</option>
+                                    <option value="250000" selected>250000</option>
+                                    <option value="460800">460800</option>
+                                    <option value="500000">500000</option>
+                                    <option value="921600">921600</option>
+                                    <option value="1000000">1000000</option>
+                                    <option value="2000000">2000000</option>
+                                </select>
+                                <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-slate-400">
+                                    <i class="fa-solid fa-chevron-down text-xs"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button id="connect-btn" class="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded shadow-lg shadow-indigo-900/30 transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-link"></i> CONNECT
+                        </button>
+                        
+                        <button id="disconnect-btn" class="hidden w-full py-2 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded shadow-lg shadow-red-900/30 transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-unlink"></i> DISCONNECT
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Protocol Settings -->
+                <div class="space-y-3">
+                     <h2 class="text-xs uppercase text-slate-500 font-bold tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-gears text-slate-600"></i> Protocol Config
+                    </h2>
+                    
+                    <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 space-y-3">
+                        
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1">Row Wires</label>
+                                <input type="number" id="cfg-rows" value="16" class="w-full bg-slate-800 border border-slate-600 text-white text-xs rounded p-1.5 focus:border-indigo-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1">Col Wires</label>
+                                <input type="number" id="cfg-cols" value="16" class="w-full bg-slate-800 border border-slate-600 text-white text-xs rounded p-1.5 focus:border-indigo-500 outline-none">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1">Nodes per Packet</label>
+                            <div class="relative">
+                                <input type="number" id="cfg-nodes" value="120" class="w-full bg-slate-800 border border-slate-600 text-white text-xs rounded p-1.5 focus:border-indigo-500 outline-none pl-8">
+                                <span class="absolute left-2 top-1.5 text-slate-500 text-xs">#</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500 mt-1">Must match 'numNodes' in firmware.</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1">Delimiter (String)</label>
+                            <div class="flex flex-col gap-1">
+                                <input type="text" id="cfg-delimiter-val" value="wr" class="bg-slate-800 border border-slate-600 text-white text-xs rounded p-1.5 w-full font-mono placeholder-slate-600" placeholder="\n or wr">
+                                <span id="delim-preview" class="text-[10px] font-mono text-indigo-400 text-right">0x77 0x72</span>
+                            </div>
+                        </div>
+                        
+                         <button id="apply-config" class="w-full py-1.5 px-3 bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold rounded transition-colors uppercase">
+                            Apply & Reset Buffer
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Visualization Settings -->
+                <div class="space-y-3">
+                     <h2 class="text-xs uppercase text-slate-500 font-bold tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-eye text-slate-600"></i> View Options
+                    </h2>
+                     <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 space-y-3">
+                        <div>
+                            <label class="flex justify-between text-[10px] text-slate-400 uppercase font-bold mb-1">
+                                <span>Gain / Scale</span>
+                                <span id="gain-val">4096</span>
+                            </label>
+                            <input type="range" id="cfg-max-val" min="100" max="8192" value="4096" step="100" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                     </div>
+                </div>
+
+            </div>
+            
+            <!-- Debug Info -->
+            <div class="mt-auto p-4 border-t border-slate-700 bg-slate-900">
+                <div class="text-[10px] font-mono text-slate-500 break-all">
+                    Last Packet Size: <span id="debug-pkt-size" class="text-slate-300">0</span> bytes<br>
+                    Buffer Len: <span id="debug-buf-len" class="text-slate-300">0</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Visualization Area -->
+        <section class="flex-1 bg-[#0f1218] relative flex flex-col">
+            
+            <!-- Canvas Container -->
+            <div class="flex-1 flex items-center justify-center p-4 overflow-hidden relative" id="canvas-container">
+                <div class="flex gap-4 items-stretch h-full max-h-[80vh]">
+                    <!-- Main Heatmap -->
+                    <div class="relative shadow-2xl shadow-black border-2 border-slate-800 rounded-sm bg-black aspect-square h-full">
+                        <canvas id="heatmapCanvas" class="w-full h-full"></canvas>
+                        <!-- Overlay Grid (Optional, CSS generated) -->
+                        <div id="grid-overlay" class="absolute inset-0 pointer-events-none opacity-20 border border-white/10"></div>
+                    </div>
+
+                    <!-- Colorbar -->
+                    <div class="flex flex-col justify-between items-center py-1">
+                        <span class="text-[10px] font-mono text-slate-400" id="colorbar-max">4096</span>
+                        <div class="h-full w-4 mx-1 border border-slate-700 rounded-sm overflow-hidden shadow-lg">
+                            <canvas id="colorbarCanvas" class="w-full h-full"></canvas>
+                        </div>
+                        <span class="text-[10px] font-mono text-slate-400">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Log Panel -->
+            <div class="h-32 bg-slate-900 border-t border-slate-700 flex flex-col shrink-0">
+                <div class="bg-slate-800 px-3 py-1 flex justify-between items-center">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Protocol Log</span>
+                    <button id="clear-log" class="text-[10px] text-slate-400 hover:text-white"><i class="fa-solid fa-trash"></i></button>
+                </div>
+                <div id="log-output" class="flex-1 p-2 font-mono text-xs overflow-y-auto log-scroll whitespace-pre-wrap text-slate-400">
+                    <div class="text-slate-600 italic">Select Baud Rate and Connect...</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        /**
+         * TACTILE SENSOR VISUALIZER LOGIC
+         * Based on Python struct: '<B' + 'H' * (1 + numNodes) + 'I'
+         * Little Endian
+         */
+
+        // --- Configuration State ---
+        let config = {
+            rows: 16,
+            cols: 16,
+            numNodes: 120,
+            delimiter: [119, 114], // 'wr' as bytes (119=w, 114=r)
+            maxVal: 4096
+        };
+
+        // --- Runtime State ---
+        let port, reader;
+        let isConnected = false;
+        let inputBuffer = new Uint8Array(0); // Dynamically growing buffer
+        let sensorData = new Float32Array(256).fill(0); // The full frame
+        let packetCount = 0;
+        let lastFrameTime = performance.now();
+        let frameCount = 0;
+        let debugLogCooldown = false;
+
+        // --- DOM Elements ---
+        const els = {
+            connectBtn: document.getElementById('connect-btn'),
+            disconnectBtn: document.getElementById('disconnect-btn'),
+            baudRate: document.getElementById('baud-rate'),
+            statusText: document.getElementById('connection-status'),
+            statusDot: document.getElementById('status-dot'),
+            canvas: document.getElementById('heatmapCanvas'),
+            colorbar: document.getElementById('colorbarCanvas'),
+            colorbarMax: document.getElementById('colorbar-max'),
+            log: document.getElementById('log-output'),
+            fps: document.getElementById('fps-counter'),
+            pkts: document.getElementById('packet-counter'),
+            maxValDisplay: document.getElementById('max-val-display'),
+            debugSize: document.getElementById('debug-pkt-size'),
+            debugBuf: document.getElementById('debug-buf-len'),
+            
+            // Config Inputs
+            cfgRows: document.getElementById('cfg-rows'),
+            cfgCols: document.getElementById('cfg-cols'),
+            cfgNodes: document.getElementById('cfg-nodes'),
+            cfgDelimVal: document.getElementById('cfg-delimiter-val'),
+            delimPreview: document.getElementById('delim-preview'),
+            cfgMaxVal: document.getElementById('cfg-max-val'),
+            applyBtn: document.getElementById('apply-config'),
+            gainVal: document.getElementById('gain-val')
+        };
+
+        const ctx = els.canvas.getContext('2d');
+        const cbCtx = els.colorbar.getContext('2d');
+
+        // --- Initialization ---
+        
+        // Setup Canvas Resolution
+        function resizeCanvas() {
+            // Main Heatmap
+            els.canvas.width = config.cols;
+            els.canvas.height = config.rows;
+            
+            // Colorbar
+            els.colorbar.width = 1;
+            els.colorbar.height = 256;
+            drawColorbar();
+            
+            // Reset buffer if size changed
+            if (sensorData.length !== config.rows * config.cols) {
+                sensorData = new Float32Array(config.rows * config.cols).fill(0);
+            }
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- Event Listeners ---
+
+        els.connectBtn.addEventListener('click', connectSerial);
+        els.disconnectBtn.addEventListener('click', disconnectSerial);
+        els.applyBtn.addEventListener('click', applyConfig);
+        document.getElementById('clear-log').addEventListener('click', () => els.log.innerHTML = '');
+
+        // Physical device disconnection handler
+        if ("serial" in navigator) {
+            navigator.serial.addEventListener("disconnect", (event) => {
+                if (isConnected) {
+                    log('error', 'Device Physically Disconnected');
+                    disconnectSerial();
+                }
+            });
+        }
+
+        els.cfgMaxVal.addEventListener('input', (e) => {
+            config.maxVal = parseInt(e.target.value);
+            els.gainVal.innerText = config.maxVal;
+            els.colorbarMax.innerText = config.maxVal;
+        });
+        
+        // Delimiter Preview Logic
+        els.cfgDelimVal.addEventListener('input', updateDelimPreview);
+        function updateDelimPreview() {
+            const bytes = parseDelimiterString(els.cfgDelimVal.value);
+            const hex = bytes.map(b => '0x' + b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+            els.delimPreview.innerText = hex || "Empty";
+        }
+
+        function parseDelimiterString(str) {
+            str = str.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+            const encoder = new TextEncoder();
+            return Array.from(encoder.encode(str));
+        }
+
+        function applyConfig() {
+            config.rows = parseInt(els.cfgRows.value);
+            config.cols = parseInt(els.cfgCols.value);
+            config.numNodes = parseInt(els.cfgNodes.value);
+            
+            const delimStr = els.cfgDelimVal.value;
+            config.delimiter = parseDelimiterString(delimStr);
+            
+            // Reset buffers
+            inputBuffer = new Uint8Array(0);
+            sensorData = new Float32Array(config.rows * config.cols).fill(0);
+            
+            resizeCanvas();
+            updateDelimPreview();
+            
+            const displayDelim = config.delimiter.map(b => '0x' + b.toString(16).toUpperCase()).join(' ');
+            log('system', `Config Applied. Nodes: ${config.numNodes}, Delim: [${displayDelim}]`);
+        }
+
+        // --- Serial Logic ---
+
+        async function connectSerial() {
+            if (!navigator.serial) {
+                alert("Web Serial API not supported in this browser.");
+                return;
+            }
+
+            try {
+                const baud = parseInt(els.baudRate.value);
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: baud });
+                
+                isConnected = true;
+                updateUI(true);
+                log('success', `Connected @ ${baud} baud`);
+                
+                readLoop();
+                drawLoop(); // Start animation loop
+            } catch (err) {
+                console.error(err);
+                log('error', `Connection Failed: ${err.message}`);
+            }
+        }
+
+        async function disconnectSerial() {
+            // CRITICAL: Set connected to false FIRST to stop the readLoop from re-locking the port
+            isConnected = false;
+            updateUI(false); 
+
+            if (reader) {
+                await reader.cancel();
+                reader = null;
+            }
+            if (port) {
+                await port.close();
+                port = null;
+            }
+            
+            log('system', 'Disconnected');
+        }
+
+        async function readLoop() {
+            while (port && port.readable && isConnected) {
+                try {
+                    reader = port.readable.getReader();
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        if (value) {
+                            processIncomingChunk(value);
+                        }
+                    }
+                } catch (error) {
+                    // Only log error if we didn't intentionally disconnect
+                    if (isConnected) {
+                        log('error', `Read Error: ${error}`);
+                    }
+                } finally {
+                    if (reader) {
+                        reader.releaseLock();
+                    }
+                }
+            }
+        }
+
+        // --- Protocol Parsing ---
+        
+        function findDelimiterIndex(buffer, delimiter, fromIndex) {
+            if (delimiter.length === 0) return -1;
+            for (let i = fromIndex; i <= buffer.length - delimiter.length; i++) {
+                let match = true;
+                for (let j = 0; j < delimiter.length; j++) {
+                    if (buffer[i + j] !== delimiter[j]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) return i;
+            }
+            return -1;
+        }
+
+        function processIncomingChunk(chunk) {
+            // 1. Append new chunk to existing buffer
+            const newBuffer = new Uint8Array(inputBuffer.length + chunk.length);
+            newBuffer.set(inputBuffer);
+            newBuffer.set(chunk, inputBuffer.length);
+            inputBuffer = newBuffer;
+
+            els.debugBuf.innerText = inputBuffer.length;
+            
+            // Expected packet size
+            const expectedSize = 7 + (2 * config.numNodes);
+
+            // SAFETY & DEBUG: Buffer Bloat Check
+            if (inputBuffer.length > expectedSize * 4 && !debugLogCooldown) {
+                // Hex dump the first 16 bytes to help user debug protocol mismatch
+                const hexDump = Array.from(inputBuffer.slice(0, 16))
+                    .map(b => b.toString(16).padStart(2,'0').toUpperCase())
+                    .join(' ');
+                
+                const delimHex = config.delimiter.map(b => b.toString(16).toUpperCase()).join(' ');
+                log('error', `Buffer Bloat! First 16 bytes: [${hexDump}]... Looking for '${delimHex}'. CHECK BAUD RATE.`);
+                
+                debugLogCooldown = true;
+                setTimeout(() => debugLogCooldown = false, 2000);
+            }
+            
+            // Hard Limit to prevent browser crash
+            if (inputBuffer.length > 200000) {
+                 log('error', 'Buffer Overflow (>200kb). Cleared. Baud Rate wrong?');
+                 inputBuffer = new Uint8Array(0);
+                 return;
+            }
+
+            // 2. Process all complete packets in buffer
+            let searchIndex = 0;
+            while (true) {
+                const delimIdx = findDelimiterIndex(inputBuffer, config.delimiter, searchIndex);
+                
+                if (delimIdx === -1) {
+                    // Keep remainder
+                    if (searchIndex > 0) {
+                        inputBuffer = inputBuffer.slice(searchIndex);
+                    }
+                    break;
+                }
+
+                // Packet is data BEFORE the delimiter
+                const packetBytes = inputBuffer.slice(searchIndex, delimIdx);
+                
+                parsePacket(packetBytes);
+                
+                // Move search forward past delimiter
+                searchIndex = delimIdx + config.delimiter.length;
+            }
+        }
+
+        function parsePacket(bytes) {
+            // Expected: <B + <H + <H*numNodes + <I
+            const expectedSize = 7 + (2 * config.numNodes);
+            
+            if (bytes.length !== expectedSize) {
+                // Occasional error logging
+                if (Math.random() < 0.05) {
+                    log('error', `Bad Pkt Size: ${bytes.length} (Exp: ${expectedSize})`);
+                    els.debugSize.innerText = bytes.length; 
+                }
+                return;
+            }
+
+            try {
+                const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+                let offset = 0;
+                
+                const sendId = dv.getUint8(offset); offset += 1;
+                const startIdx = dv.getUint16(offset, true); offset += 2;
+
+                const readings = [];
+                for (let i = 0; i < config.numNodes; i++) {
+                    readings.push(dv.getUint16(offset, true));
+                    offset += 2;
+                }
+
+                const packetNum = dv.getUint32(offset, true);
+                
+                updateHeatmapModel(startIdx, readings);
+                
+                packetCount++;
+                els.pkts.innerText = packetCount;
+
+            } catch (e) {
+                log('error', `Parse Except: ${e.message}`);
+            }
+        }
+
+        function updateHeatmapModel(startIdx, readings) {
+            const totalPixels = config.rows * config.cols;
+            for (let i = 0; i < readings.length; i++) {
+                const targetIdx = (startIdx + i) % totalPixels;
+                sensorData[targetIdx] = readings[i];
+            }
+        }
+
+        // --- Rendering ---
+
+        function drawLoop() {
+            if (!isConnected) {
+                 requestAnimationFrame(drawLoop);
+                 return;
+            }
+
+            const w = config.cols;
+            const h = config.rows;
+            const imageData = ctx.createImageData(w, h);
+            const data = imageData.data;
+
+            let maxValInFrame = 0;
+
+            for (let i = 0; i < sensorData.length; i++) {
+                const val = sensorData[i];
+                if (val > maxValInFrame) maxValInFrame = val;
+                
+                const [r, g, b] = getHeatmapColor(val, config.maxVal);
+
+                const pxIndex = i * 4;
+                data[pxIndex] = r;
+                data[pxIndex + 1] = g;
+                data[pxIndex + 2] = b;
+                data[pxIndex + 3] = 255;
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+            els.maxValDisplay.innerText = maxValInFrame;
+            
+            frameCount++;
+            const now = performance.now();
+            if (now - lastFrameTime >= 1000) {
+                els.fps.innerText = frameCount;
+                frameCount = 0;
+                lastFrameTime = now;
+            }
+
+            requestAnimationFrame(drawLoop);
+        }
+
+        function drawColorbar() {
+            const h = els.colorbar.height;
+            const w = els.colorbar.width;
+            const imgData = cbCtx.createImageData(w, h);
+            const data = imgData.data;
+
+            for (let y = 0; y < h; y++) {
+                const normalized = 1 - (y / h);
+                const val = normalized * config.maxVal;
+                const [r, g, b] = getHeatmapColor(val, config.maxVal);
+                
+                const idx = y * 4;
+                data[idx] = r;
+                data[idx+1] = g;
+                data[idx+2] = b;
+                data[idx+3] = 255;
+            }
+            cbCtx.putImageData(imgData, 0, 0);
+        }
+
+        function getHeatmapColor(value, max) {
+            let normalized = value / max;
+            if (normalized > 1) normalized = 1;
+            if (normalized < 0) normalized = 0;
+
+            const hue = 240 - (normalized * 240);
+            return hslToRgb(hue / 360, 1.0, 0.5);
+        }
+
+        function hslToRgb(h, s, l) {
+            let r, g, b;
+            if (s === 0) {
+                r = g = b = l; 
+            } else {
+                const hue2rgb = (p, q, t) => {
+                    if (t < 0) t += 1;
+                    if (t > 1) t -= 1;
+                    if (t < 1/6) return p + (q - p) * 6 * t;
+                    if (t < 1/2) return q;
+                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                    return p;
+                };
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1/3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1/3);
+            }
+            return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+        }
+
+        // --- UI Helpers ---
+
+        function updateUI(connected) {
+            if (connected) {
+                els.connectBtn.classList.add('hidden');
+                els.disconnectBtn.classList.remove('hidden');
+                els.baudRate.disabled = true;
+                els.statusText.innerText = "Connected";
+                els.statusText.classList.replace('text-slate-500', 'text-green-400');
+                els.statusDot.classList.replace('bg-slate-600', 'bg-green-500');
+                els.statusDot.classList.add('animate-pulse');
+            } else {
+                els.connectBtn.classList.remove('hidden');
+                els.disconnectBtn.classList.add('hidden');
+                els.baudRate.disabled = false;
+                els.statusText.innerText = "Disconnected";
+                els.statusText.classList.replace('text-green-400', 'text-slate-500');
+                els.statusDot.classList.replace('bg-green-500', 'bg-slate-600');
+                els.statusDot.classList.remove('animate-pulse');
+            }
+        }
+
+        function log(type, msg) {
+            const div = document.createElement('div');
+            const color = type === 'error' ? 'text-red-400' : type === 'success' ? 'text-green-400' : 'text-slate-400';
+            const icon = type === 'error' ? '!' : type === 'success' ? '✓' : '>';
+            
+            if (els.log.children.length > 50) els.log.removeChild(els.log.firstChild);
+            div.innerHTML = `<span class="opacity-50 font-bold mr-2">${icon}</span><span class="${color}">${msg}</span>`;
+            els.log.appendChild(div);
+            els.log.scrollTop = els.log.scrollHeight;
+        }
+
+        // --- Startup ---
+        applyConfig();
+        resizeCanvas();
+
+    </script>
+</body>
+</html>
