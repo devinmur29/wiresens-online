@@ -3,55 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tactile Sensor Visualizer</title>
+    <title>Tactile AI Workbench</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* Custom Scrollbar for Logs */
-        .log-scroll::-webkit-scrollbar {
-            width: 6px;
-        }
-        .log-scroll::-webkit-scrollbar-track {
-            background: #1f2937; 
-        }
-        .log-scroll::-webkit-scrollbar-thumb {
-            background: #4b5563; 
-            border-radius: 3px;
-        }
+        .log-scroll::-webkit-scrollbar { width: 6px; }
+        .log-scroll::-webkit-scrollbar-track { background: #1f2937; }
+        .log-scroll::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+        canvas { image-rendering: pixelated; }
         
-        canvas {
-            image-rendering: pixelated; /* Crucial for sharp grid rendering */
-        }
+        /* Iframe transition */
+        #app-frame-container { transition: opacity 0.3s ease; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-200 h-screen flex flex-col font-sans overflow-hidden">
 
-    <!-- Header -->
     <header class="bg-slate-800 border-b border-slate-700 p-3 shadow-lg shrink-0 z-10">
         <div class="max-w-full mx-auto flex flex-col md:flex-row justify-between items-center gap-4 px-4">
             <div class="flex items-center gap-3">
                 <div class="bg-indigo-600 p-2 rounded-lg shadow-lg shadow-indigo-900/50">
-                    <i class="fa-solid fa-layer-group text-white text-lg"></i>
+                    <i class="fa-solid fa-microchip text-white text-lg"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold text-white tracking-wide">Tactile Visualizer</h1>
-                    <p class="text-xs text-slate-400">Binary Protocol Parser</p>
+                    <h1 class="text-lg font-bold text-white tracking-wide">Tactile AI Workbench</h1>
+                    <p class="text-xs text-slate-400">Sensor-to-Code Pipeline</p>
                 </div>
             </div>
 
-            <div id="support-banner" class="hidden px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/50">
-                Web Serial Not Supported
-            </div>
-            
             <div class="flex items-center gap-4">
-                 <!-- Stats -->
-                <div class="flex gap-4 text-xs font-mono text-slate-400 bg-slate-900/50 p-1.5 rounded-lg border border-slate-700/50">
+                 <div class="flex gap-4 text-xs font-mono text-slate-400 bg-slate-900/50 p-1.5 rounded-lg border border-slate-700/50">
                     <div>FPS: <span id="fps-counter" class="text-indigo-400">0</span></div>
                     <div>Pkts: <span id="packet-counter" class="text-indigo-400">0</span></div>
-                    <div>Max Val: <span id="max-val-display" class="text-indigo-400">0</span></div>
+                    <div>Max: <span id="max-val-display" class="text-indigo-400">0</span></div>
                 </div>
 
-                <!-- Connection Status -->
                 <div class="flex items-center gap-2 border-l border-slate-700 pl-4">
                     <div class="flex flex-col items-end">
                         <span id="connection-status" class="text-sm font-medium text-slate-500">Disconnected</span>
@@ -62,14 +47,30 @@
         </div>
     </header>
 
-    <!-- Main Content -->
     <main class="flex-1 flex flex-col md:flex-row w-full overflow-hidden">
         
-        <!-- Sidebar Controls -->
-        <aside class="w-full md:w-72 bg-slate-800 border-r border-slate-700 flex flex-col z-20 shadow-xl overflow-y-auto">
+        <aside class="w-full md:w-80 bg-slate-800 border-r border-slate-700 flex flex-col z-20 shadow-xl overflow-y-auto">
             <div class="p-4 space-y-6">
                 
-                <!-- Connection Panel -->
+                <div class="bg-indigo-900/20 border border-indigo-500/30 rounded-lg p-3 space-y-3">
+                    <h2 class="text-xs uppercase text-indigo-400 font-bold tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> AI Prototyper
+                    </h2>
+                    
+                    <div>
+                        <textarea id="ai-prompt" rows="4" class="w-full bg-slate-900 border border-indigo-500/30 text-white text-xs rounded p-2 focus:border-indigo-500 outline-none resize-none placeholder-slate-600" placeholder="Describe an app...&#10;Ex: 'Make a Flappy Bird game controlled by pressure.'"></textarea>
+                    </div>
+
+                    <button id="generate-btn" class="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded shadow-lg transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-code"></i> GENERATE APP
+                    </button>
+                    
+                    <div class="flex gap-2">
+                        <button id="view-heatmap-btn" class="flex-1 py-1 px-2 bg-slate-700 text-[10px] font-bold rounded text-slate-300 hover:bg-slate-600">View Heatmap</button>
+                        <button id="view-app-btn" class="flex-1 py-1 px-2 bg-indigo-900/50 border border-indigo-500/50 text-[10px] font-bold rounded text-indigo-300 hover:bg-indigo-900">View App</button>
+                    </div>
+                </div>
+
                 <div class="space-y-3">
                     <h2 class="text-xs uppercase text-slate-500 font-bold tracking-wider flex items-center gap-2">
                         <i class="fa-solid fa-plug text-slate-600"></i> Connection
@@ -78,134 +79,92 @@
                     <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 space-y-3">
                         <div>
                             <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1">Baud Rate</label>
-                            <div class="relative">
-                                <select id="baud-rate" class="w-full bg-slate-800 border border-slate-600 text-white text-xs rounded p-2 focus:border-indigo-500 outline-none appearance-none">
-                                    <option value="9600">9600</option>
-                                    <option value="115200">115200</option>
-                                    <option value="250000" selected>250000</option>
-                                    <option value="460800">460800</option>
-                                    <option value="500000">500000</option>
-                                    <option value="921600">921600</option>
-                                    <option value="1000000">1000000</option>
-                                    <option value="2000000">2000000</option>
-                                </select>
-                                <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-slate-400">
-                                    <i class="fa-solid fa-chevron-down text-xs"></i>
-                                </div>
-                            </div>
+                            <select id="baud-rate" class="w-full bg-slate-800 border border-slate-600 text-white text-xs rounded p-2 outline-none">
+                                <option value="9600">9600</option>
+                                <option value="115200">115200</option>
+                                <option value="250000" selected>250000</option>
+                                <option value="500000">500000</option>
+                                <option value="2000000">2000000</option>
+                            </select>
                         </div>
                         
-                        <button id="connect-btn" class="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded shadow-lg shadow-indigo-900/30 transition-all flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-link"></i> CONNECT
+                        <button id="connect-btn" class="w-full py-2 px-4 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-link"></i> CONNECT SERIAL
                         </button>
-                        
-                        <button id="disconnect-btn" class="hidden w-full py-2 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded shadow-lg shadow-red-900/30 transition-all flex items-center justify-center gap-2">
+                        <button id="disconnect-btn" class="hidden w-full py-2 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded flex items-center justify-center gap-2">
                             <i class="fa-solid fa-unlink"></i> DISCONNECT
                         </button>
                     </div>
                 </div>
 
-                <!-- Protocol Settings -->
                 <div class="space-y-3">
                      <h2 class="text-xs uppercase text-slate-500 font-bold tracking-wider flex items-center gap-2">
-                        <i class="fa-solid fa-gears text-slate-600"></i> Protocol Config
+                        <i class="fa-solid fa-gears text-slate-600"></i> Config
                     </h2>
-                    
                     <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 space-y-3">
-                        
                         <div class="grid grid-cols-2 gap-2">
                             <div>
-                                <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1">Row Wires</label>
-                                <input type="number" id="cfg-rows" value="16" class="w-full bg-slate-800 border border-slate-600 text-white text-xs rounded p-1.5 focus:border-indigo-500 outline-none">
+                                <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1">Row/Col</label>
+                                <div class="flex gap-1">
+                                    <input type="number" id="cfg-rows" value="16" class="w-full bg-slate-800 border border-slate-600 text-white text-xs rounded p-1.5 outline-none">
+                                    <input type="number" id="cfg-cols" value="16" class="w-full bg-slate-800 border border-slate-600 text-white text-xs rounded p-1.5 outline-none">
+                                </div>
                             </div>
                             <div>
-                                <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1">Col Wires</label>
-                                <input type="number" id="cfg-cols" value="16" class="w-full bg-slate-800 border border-slate-600 text-white text-xs rounded p-1.5 focus:border-indigo-500 outline-none">
+                                <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1">Nodes</label>
+                                <input type="number" id="cfg-nodes" value="120" class="w-full bg-slate-800 border border-slate-600 text-white text-xs rounded p-1.5 outline-none">
                             </div>
                         </div>
-
-                        <div>
-                            <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1">Nodes per Packet</label>
-                            <div class="relative">
-                                <input type="number" id="cfg-nodes" value="120" class="w-full bg-slate-800 border border-slate-600 text-white text-xs rounded p-1.5 focus:border-indigo-500 outline-none pl-8">
-                                <span class="absolute left-2 top-1.5 text-slate-500 text-xs">#</span>
-                            </div>
-                            <p class="text-[10px] text-slate-500 mt-1">Must match 'numNodes' in firmware.</p>
-                        </div>
-
-                        <div>
-                            <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1">Delimiter (String)</label>
-                            <div class="flex flex-col gap-1">
-                                <input type="text" id="cfg-delimiter-val" value="wr" class="bg-slate-800 border border-slate-600 text-white text-xs rounded p-1.5 w-full font-mono placeholder-slate-600" placeholder="\n or wr">
-                                <span id="delim-preview" class="text-[10px] font-mono text-indigo-400 text-right">0x77 0x72</span>
-                            </div>
-                        </div>
-                        
                          <button id="apply-config" class="w-full py-1.5 px-3 bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold rounded transition-colors uppercase">
-                            Apply & Reset Buffer
+                            Apply & Reset
                         </button>
+                        <button id="clear-regions" class="w-full mt-2 py-1.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] font-bold rounded transition-colors uppercase border border-slate-600">
+                            Clear Regions
+                        </button>
+                        <div id="region-list" class="space-y-1 mt-2 max-h-32 overflow-y-auto"></div>
                     </div>
-                </div>
-
-                <!-- Visualization Settings -->
-                <div class="space-y-3">
-                     <h2 class="text-xs uppercase text-slate-500 font-bold tracking-wider flex items-center gap-2">
-                        <i class="fa-solid fa-eye text-slate-600"></i> View Options
-                    </h2>
-                     <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 space-y-3">
-                        <div>
-                            <label class="flex justify-between text-[10px] text-slate-400 uppercase font-bold mb-1">
-                                <span>Gain / Scale</span>
-                                <span id="gain-val">4096</span>
-                            </label>
-                            <input type="range" id="cfg-max-val" min="100" max="8192" value="4096" step="100" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer">
-                        </div>
-                     </div>
-                </div>
-
-            </div>
-            
-            <!-- Debug Info -->
-            <div class="mt-auto p-4 border-t border-slate-700 bg-slate-900">
-                <div class="text-[10px] font-mono text-slate-500 break-all">
-                    Last Packet Size: <span id="debug-pkt-size" class="text-slate-300">0</span> bytes<br>
-                    Buffer Len: <span id="debug-buf-len" class="text-slate-300">0</span>
                 </div>
             </div>
         </aside>
 
-        <!-- Visualization Area -->
         <section class="flex-1 bg-[#0f1218] relative flex flex-col">
             
-            <!-- Canvas Container -->
-            <div class="flex-1 flex items-center justify-center p-4 overflow-hidden relative" id="canvas-container">
-                <div class="flex gap-4 items-stretch h-full max-h-[80vh]">
-                    <!-- Main Heatmap -->
+            <div class="flex-1 flex items-center justify-center p-4 overflow-hidden relative">
+                
+                <div id="view-heatmap" class="flex gap-4 items-stretch h-full max-h-[80vh] transition-opacity duration-300">
                     <div class="relative shadow-2xl shadow-black border-2 border-slate-800 rounded-sm bg-black aspect-square h-full">
                         <canvas id="heatmapCanvas" class="w-full h-full"></canvas>
-                        <!-- Overlay Grid (Optional, CSS generated) -->
-                        <div id="grid-overlay" class="absolute inset-0 pointer-events-none opacity-20 border border-white/10"></div>
+                        <div class="absolute inset-0 pointer-events-none opacity-20 border border-white/10" style="background-image: linear-gradient(white 1px, transparent 1px), linear-gradient(90deg, white 1px, transparent 1px); background-size: 6.25% 6.25%;"></div>
+                        <canvas id="uiCanvas" class="absolute inset-0 w-full h-full cursor-crosshair"></canvas>
                     </div>
-
-                    <!-- Colorbar -->
                     <div class="flex flex-col justify-between items-center py-1">
                         <span class="text-[10px] font-mono text-slate-400" id="colorbar-max">4096</span>
-                        <div class="h-full w-4 mx-1 border border-slate-700 rounded-sm overflow-hidden shadow-lg">
+                        <div class="h-full w-4 mx-1 border border-slate-700 rounded-sm overflow-hidden">
                             <canvas id="colorbarCanvas" class="w-full h-full"></canvas>
                         </div>
                         <span class="text-[10px] font-mono text-slate-400">0</span>
                     </div>
                 </div>
+
+                <div id="view-app" class="absolute inset-4 hidden bg-white rounded-lg shadow-2xl overflow-hidden border-4 border-indigo-900">
+                    <div class="absolute inset-0 flex items-center justify-center text-slate-400 pointer-events-none z-0">
+                        <div class="text-center">
+                            <i class="fa-solid fa-code text-4xl mb-4 opacity-50"></i>
+                            <p class="text-sm">App Sandbox Ready</p>
+                        </div>
+                    </div>
+                    <iframe id="app-iframe" class="relative z-10 w-full h-full" sandbox="allow-scripts allow-modals"></iframe>
+                </div>
+
             </div>
 
-            <!-- Bottom Log Panel -->
             <div class="h-32 bg-slate-900 border-t border-slate-700 flex flex-col shrink-0">
                 <div class="bg-slate-800 px-3 py-1 flex justify-between items-center">
-                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Protocol Log</span>
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">System Log</span>
                     <button id="clear-log" class="text-[10px] text-slate-400 hover:text-white"><i class="fa-solid fa-trash"></i></button>
                 </div>
                 <div id="log-output" class="flex-1 p-2 font-mono text-xs overflow-y-auto log-scroll whitespace-pre-wrap text-slate-400">
-                    <div class="text-slate-600 italic">Select Baud Rate and Connect...</div>
+                    <div class="text-indigo-400">System Ready.</div>
                 </div>
             </div>
         </section>
@@ -213,452 +172,618 @@
 
     <script>
         /**
-         * TACTILE SENSOR VISUALIZER LOGIC
-         * Based on Python struct: '<B' + 'H' * (1 + numNodes) + 'I'
-         * Little Endian
+         * TACTILE AI WORKBENCH LOGIC
+         * Includes Serial Parsing + Iframe Data Bridging
          */
 
-        // --- Configuration State ---
+        // --- Config ---
         let config = {
-            rows: 16,
-            cols: 16,
-            numNodes: 120,
-            delimiter: [119, 114], // 'wr' as bytes (119=w, 114=r)
+            rows: 16, cols: 16, numNodes: 120,
+            delimiter: [119, 114], // 'wr'
             maxVal: 4096
         };
 
-        // --- Runtime State ---
-        let port, reader;
-        let isConnected = false;
-        let inputBuffer = new Uint8Array(0); // Dynamically growing buffer
-        let sensorData = new Float32Array(256).fill(0); // The full frame
+        // --- Runtime ---
+        let port, reader, isConnected = false;
+        let inputBuffer = new Uint8Array(0);
+        let sensorData = new Float32Array(256).fill(0);
         let packetCount = 0;
         let lastFrameTime = performance.now();
         let frameCount = 0;
-        let debugLogCooldown = false;
+        let regions = []; // {x,y,w,h,label}
+        let dragStart = null;
 
-        // --- DOM Elements ---
+        // --- DOM ---
         const els = {
+            // Serial Controls
             connectBtn: document.getElementById('connect-btn'),
             disconnectBtn: document.getElementById('disconnect-btn'),
             baudRate: document.getElementById('baud-rate'),
             statusText: document.getElementById('connection-status'),
             statusDot: document.getElementById('status-dot'),
+            clearRegionsBtn: document.getElementById('clear-regions'),
+            regionList: document.getElementById('region-list'),
+            
+            // Visuals
             canvas: document.getElementById('heatmapCanvas'),
             colorbar: document.getElementById('colorbarCanvas'),
-            colorbarMax: document.getElementById('colorbar-max'),
-            log: document.getElementById('log-output'),
             fps: document.getElementById('fps-counter'),
             pkts: document.getElementById('packet-counter'),
-            maxValDisplay: document.getElementById('max-val-display'),
-            debugSize: document.getElementById('debug-pkt-size'),
-            debugBuf: document.getElementById('debug-buf-len'),
+            maxDisplay: document.getElementById('max-val-display'),
+            uiCanvas: document.getElementById('uiCanvas'),
+            log: document.getElementById('log-output'),
             
-            // Config Inputs
+            // AI Controls
+            prompt: document.getElementById('ai-prompt'),
+            genBtn: document.getElementById('generate-btn'),
+            viewHeatmapBtn: document.getElementById('view-heatmap-btn'),
+            viewAppBtn: document.getElementById('view-app-btn'),
+            viewHeatmapDiv: document.getElementById('view-heatmap'),
+            viewAppDiv: document.getElementById('view-app'),
+            iframe: document.getElementById('app-iframe'),
+            
+            // Config
             cfgRows: document.getElementById('cfg-rows'),
             cfgCols: document.getElementById('cfg-cols'),
             cfgNodes: document.getElementById('cfg-nodes'),
-            cfgDelimVal: document.getElementById('cfg-delimiter-val'),
-            delimPreview: document.getElementById('delim-preview'),
-            cfgMaxVal: document.getElementById('cfg-max-val'),
             applyBtn: document.getElementById('apply-config'),
-            gainVal: document.getElementById('gain-val')
         };
 
         const ctx = els.canvas.getContext('2d');
         const cbCtx = els.colorbar.getContext('2d');
+        const uiCtx = els.uiCanvas.getContext('2d');
 
-        // --- Initialization ---
+        // --- Region Drawing Logic ---
         
-        // Setup Canvas Resolution
-        function resizeCanvas() {
-            // Main Heatmap
-            els.canvas.width = config.cols;
-            els.canvas.height = config.rows;
-            
-            // Colorbar
-            els.colorbar.width = 1;
-            els.colorbar.height = 256;
-            drawColorbar();
-            
-            // Reset buffer if size changed
-            if (sensorData.length !== config.rows * config.cols) {
-                sensorData = new Float32Array(config.rows * config.cols).fill(0);
-            }
+        function resizeUiCanvas() {
+            const rect = els.canvas.getBoundingClientRect();
+            els.uiCanvas.width = rect.width;
+            els.uiCanvas.height = rect.height;
         }
-        
-        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('resize', resizeUiCanvas);
 
-        // --- Event Listeners ---
+        els.uiCanvas.addEventListener('mousedown', e => {
+            const c = getGridCoord(e);
+            dragStart = c;
+        });
 
-        els.connectBtn.addEventListener('click', connectSerial);
-        els.disconnectBtn.addEventListener('click', disconnectSerial);
-        els.applyBtn.addEventListener('click', applyConfig);
-        document.getElementById('clear-log').addEventListener('click', () => els.log.innerHTML = '');
+        els.uiCanvas.addEventListener('mousemove', e => {
+            if(dragStart) drawRegions(getGridCoord(e));
+        });
 
-        // Physical device disconnection handler
-        if ("serial" in navigator) {
-            navigator.serial.addEventListener("disconnect", (event) => {
-                if (isConnected) {
-                    log('error', 'Device Physically Disconnected');
-                    disconnectSerial();
-                }
+        els.uiCanvas.addEventListener('mouseup', e => {
+            if(dragStart) {
+                const c = getGridCoord(e);
+                const x = Math.min(dragStart.x, c.x), y = Math.min(dragStart.y, c.y);
+                const w = Math.abs(dragStart.x - c.x) + 1, h = Math.abs(dragStart.y - c.y) + 1;
+                const label = regions.length === 0 ? "index" : `region_${regions.length}`;
+                regions.push({x, y, w, h, label});
+                dragStart = null;
+                renderRegionList();
+            }
+        });
+
+        els.clearRegionsBtn.addEventListener('click', () => { regions = []; renderRegionList(); });
+
+        function renderRegionList() {
+            els.regionList.innerHTML = '';
+            regions.forEach((r, i) => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center gap-2 bg-slate-800 p-1 rounded border border-slate-600';
+                
+                const colorBox = document.createElement('div');
+                colorBox.className = 'w-2 h-2 rounded-full bg-cyan-400 shrink-0';
+                
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = r.label;
+                input.className = 'bg-transparent text-[10px] text-white w-full outline-none border-b border-transparent focus:border-indigo-500';
+                input.oninput = (e) => { r.label = e.target.value; };
+                
+                const delBtn = document.createElement('button');
+                delBtn.innerHTML = '<i class="fa-solid fa-times"></i>';
+                delBtn.className = 'text-slate-500 hover:text-red-400 text-[10px] px-1';
+                delBtn.onclick = () => { regions.splice(i, 1); renderRegionList(); };
+
+                div.appendChild(colorBox);
+                div.appendChild(input);
+                div.appendChild(delBtn);
+                els.regionList.appendChild(div);
             });
         }
 
-        els.cfgMaxVal.addEventListener('input', (e) => {
-            config.maxVal = parseInt(e.target.value);
-            els.gainVal.innerText = config.maxVal;
-            els.colorbarMax.innerText = config.maxVal;
-        });
-        
-        // Delimiter Preview Logic
-        els.cfgDelimVal.addEventListener('input', updateDelimPreview);
-        function updateDelimPreview() {
-            const bytes = parseDelimiterString(els.cfgDelimVal.value);
-            const hex = bytes.map(b => '0x' + b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
-            els.delimPreview.innerText = hex || "Empty";
+        function getGridCoord(e) {
+            const rect = els.uiCanvas.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) / rect.width * config.cols);
+            const y = Math.floor((e.clientY - rect.top) / rect.height * config.rows);
+            return { x: Math.max(0, Math.min(config.cols-1, x)), y: Math.max(0, Math.min(config.rows-1, y)) };
         }
 
-        function parseDelimiterString(str) {
-            str = str.replace(/\\n/g, '\n').replace(/\\r/g, '\r');
-            const encoder = new TextEncoder();
-            return Array.from(encoder.encode(str));
+        // --- AI & Iframe Logic (The New Part) ---
+
+        // 1. Toggle Views
+        els.viewHeatmapBtn.addEventListener('click', () => switchView('heatmap'));
+        els.viewAppBtn.addEventListener('click', () => switchView('app'));
+
+        function switchView(view) {
+            if (view === 'heatmap') {
+                els.viewHeatmapDiv.classList.remove('hidden');
+                els.viewAppDiv.classList.add('hidden');
+                els.viewHeatmapBtn.classList.replace('bg-slate-700', 'bg-indigo-600');
+            } else {
+                els.viewHeatmapDiv.classList.add('hidden');
+                els.viewAppDiv.classList.remove('hidden');
+            }
+        }
+
+        // 2. Generate Code (Mock API Call)
+        els.genBtn.addEventListener('click', async () => {
+            const prompt = els.prompt.value.toLowerCase();
+            if (!prompt) return;
+
+            log('system', 'Generating App...');
+            els.genBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+            
+            // Simulate API Latency
+            setTimeout(() => {
+                let generatedHTML = "";
+
+                // --- MOCK AI LOGIC ---
+                // In a real app, you would fetch() to OpenAI/Gemini here.
+                // For this demo, we check for keywords to prove the concept.
+                
+                if (prompt.includes('flappy')) {
+                    generatedHTML = getFlappyBirdTemplate();
+                    log('success', 'Generated: Tactile Flappy Bird');
+                } else if (prompt.includes('paint') || prompt.includes('draw')) {
+                    generatedHTML = getPaintTemplate();
+                    log('success', 'Generated: Finger Painting App');
+                } else {
+                    generatedHTML = getDebugTemplate();
+                    log('system', 'Unknown prompt. Generated Debug Visualizer.');
+                }
+
+                els.iframe.srcdoc = generatedHTML;
+                switchView('app');
+                els.genBtn.innerHTML = '<i class="fa-solid fa-code"></i> GENERATE APP';
+            }, 1000);
+        });
+
+        // 3. The Data Bridge: Send sensor data to Iframe
+        function broadcastToApp() {
+            if (els.viewAppDiv.classList.contains('hidden')) return; // Don't send if hidden
+
+            // Calculate basic stats to make it easier for the generated app
+            let maxVal = 0;
+            let sum = 0;
+            for(let v of sensorData) {
+                if(v > maxVal) maxVal = v;
+                sum += v;
+            }
+            let avg = sum / sensorData.length;
+
+            // Region Stats
+            const regionStats = {};
+            regions.forEach(r => {
+                let rSum = 0, count = 0;
+                for(let y=r.y; y<r.y+r.h; y++) {
+                    for(let x=r.x; x<r.x+r.w; x++) {
+                        const idx = y*config.cols + x;
+                        if(idx < sensorData.length) {
+                            rSum += sensorData[idx];
+                            count++;
+                        }
+                    }
+                }
+                regionStats[r.label] = { avg: count ? rSum/count : 0, ...r };
+            });
+
+            // Post Message Protocol
+            const payload = {
+                type: 'sensor_update',
+                timestamp: performance.now(),
+                config: { rows: config.rows, cols: config.cols, maxVal: config.maxVal },
+                data: Array.from(sensorData), // Convert TypedArray to normal array for JSON
+                stats: { max: maxVal, avg: avg },
+                regions: regionStats
+            };
+
+            // Send to iframe
+            if (els.iframe.contentWindow) {
+                els.iframe.contentWindow.postMessage(payload, '*');
+            }
+        }
+
+        // --- Core Serial Logic (Existing) ---
+
+        async function connectSerial() {
+            if (!navigator.serial) return alert("Web Serial not supported");
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: parseInt(els.baudRate.value) });
+                isConnected = true;
+                updateUI(true);
+                readLoop();
+                drawLoop();
+            } catch (err) { log('error', err.message); }
+        }
+        
+        async function disconnectSerial() {
+            isConnected = false;
+            updateUI(false);
+            if (reader) await reader.cancel();
+            if (port) await port.close();
+        }
+
+        async function readLoop() {
+            while (port.readable && isConnected) {
+                try {
+                    reader = port.readable.getReader();
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        if (value) processChunk(value);
+                    }
+                } catch (e) { log('error', e); }
+                finally { reader.releaseLock(); }
+            }
+        }
+
+        function processChunk(chunk) {
+            const newBuf = new Uint8Array(inputBuffer.length + chunk.length);
+            newBuf.set(inputBuffer);
+            newBuf.set(chunk, inputBuffer.length);
+            inputBuffer = newBuf;
+
+            const packetSize = 7 + (2 * config.numNodes);
+            // Safety limit
+            if (inputBuffer.length > 200000) inputBuffer = new Uint8Array(0);
+
+            let searchIdx = 0;
+            while(true) {
+                // Find delimiter
+                let delimIdx = -1;
+                for(let i=searchIdx; i <= inputBuffer.length - config.delimiter.length; i++) {
+                    if(inputBuffer[i] === config.delimiter[0] && inputBuffer[i+1] === config.delimiter[1]) {
+                        delimIdx = i; break;
+                    }
+                }
+                
+                if(delimIdx === -1) {
+                    if(searchIdx > 0) inputBuffer = inputBuffer.slice(searchIdx);
+                    break;
+                }
+
+                const pkt = inputBuffer.slice(searchIdx, delimIdx);
+                if(pkt.length === packetSize) parsePacket(pkt);
+                searchIdx = delimIdx + config.delimiter.length;
+            }
+        }
+
+        function parsePacket(bytes) {
+            const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+            const startIdx = dv.getUint16(1, true);
+            for(let i=0; i<config.numNodes; i++) {
+                sensorData[(startIdx + i) % (config.rows*config.cols)] = dv.getUint16(3 + (i*2), true);
+            }
+            packetCount++;
+            els.pkts.innerText = packetCount;
+        }
+
+        // --- Rendering Loop ---
+        function drawLoop() {
+            if(!isConnected) { requestAnimationFrame(drawLoop); return; }
+
+            // 1. Draw Heatmap
+            const w = config.cols, h = config.rows;
+            const imgData = ctx.createImageData(w, h);
+            let maxInFrame = 0;
+            for(let i=0; i<sensorData.length; i++) {
+                const val = sensorData[i];
+                if(val > maxInFrame) maxInFrame = val;
+                const c = getHeatmapColor(val, config.maxVal);
+                const idx = i*4;
+                imgData.data[idx]=c[0]; imgData.data[idx+1]=c[1]; imgData.data[idx+2]=c[2]; imgData.data[idx+3]=255;
+            }
+            ctx.putImageData(imgData, 0, 0);
+            els.maxDisplay.innerText = maxInFrame;
+
+            // 2. Draw UI (Regions)
+            drawRegions(dragStart ? getGridCoord({clientX:0, clientY:0}) : null); // Hack: mousemove handles drag preview
+
+            // 2. Broadcast to AI App
+            broadcastToApp();
+
+            frameCount++;
+            const now = performance.now();
+            if(now - lastFrameTime >= 1000) {
+                els.fps.innerText = frameCount;
+                frameCount=0; lastFrameTime=now;
+            }
+            requestAnimationFrame(drawLoop);
+        }
+
+        function drawRegions(currentDragEnd) {
+            uiCtx.clearRect(0, 0, els.uiCanvas.width, els.uiCanvas.height);
+            const w = els.uiCanvas.width / config.cols;
+            const h = els.uiCanvas.height / config.rows;
+
+            const drawRect = (r, color) => {
+                uiCtx.strokeStyle = color;
+                uiCtx.lineWidth = 2;
+                uiCtx.strokeRect(r.x * w, r.y * h, r.w * w, r.h * h);
+                uiCtx.fillStyle = color;
+                uiCtx.font = "10px monospace";
+                uiCtx.fillText(r.label || "drawing...", r.x * w + 2, r.y * h + 12);
+            };
+
+            regions.forEach(r => drawRect(r, '#00ffff'));
+
+            if(dragStart && window.event && window.event.type === 'mousemove') {
+                const c = getGridCoord(window.event);
+                const x = Math.min(dragStart.x, c.x), y = Math.min(dragStart.y, c.y);
+                const rw = Math.abs(dragStart.x - c.x) + 1, rh = Math.abs(dragStart.y - c.y) + 1;
+                drawRect({x, y, w: rw, h: rh, label: ''}, '#ffffff');
+            }
+        }
+
+
+        // --- Helpers ---
+        function getHeatmapColor(v, max) {
+            let n = Math.min(Math.max(v/max, 0), 1);
+            const h = (1.0 - n) * 240;
+            return hslToRgb(h/360, 1, 0.5);
+        }
+
+        function hslToRgb(h, s, l) {
+            let r, g, b;
+            if (s === 0) r = g = b = l; 
+            else {
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1/3); g = hue2rgb(p, q, h); b = hue2rgb(p, q, h - 1/3);
+            }
+            return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+        }
+        const hue2rgb = (p, q, t) => {
+            if (t < 0) t += 1; if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+        };
+
+        function updateUI(connected) {
+            if(connected) {
+                els.connectBtn.classList.add('hidden');
+                els.disconnectBtn.classList.remove('hidden');
+                els.statusText.innerText = "Connected";
+                els.statusText.className = "text-sm font-medium text-green-400";
+                els.statusDot.className = "w-3 h-3 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]";
+            } else {
+                els.connectBtn.classList.remove('hidden');
+                els.disconnectBtn.classList.add('hidden');
+                els.statusText.innerText = "Disconnected";
+                els.statusText.className = "text-sm font-medium text-slate-500";
+                els.statusDot.className = "w-3 h-3 rounded-full bg-slate-600 shadow-none";
+            }
+        }
+        
+        function log(type, msg) {
+            const div = document.createElement('div');
+            const color = type==='error'?'text-red-400':type==='success'?'text-green-400':'text-slate-400';
+            div.innerHTML = `<span class="${color}">> ${msg}</span>`;
+            els.log.appendChild(div);
+            els.log.scrollTop = els.log.scrollHeight;
         }
 
         function applyConfig() {
             config.rows = parseInt(els.cfgRows.value);
             config.cols = parseInt(els.cfgCols.value);
             config.numNodes = parseInt(els.cfgNodes.value);
-            
-            const delimStr = els.cfgDelimVal.value;
-            config.delimiter = parseDelimiterString(delimStr);
-            
-            // Reset buffers
             inputBuffer = new Uint8Array(0);
             sensorData = new Float32Array(config.rows * config.cols).fill(0);
-            
-            resizeCanvas();
-            updateDelimPreview();
-            
-            const displayDelim = config.delimiter.map(b => '0x' + b.toString(16).toUpperCase()).join(' ');
-            log('system', `Config Applied. Nodes: ${config.numNodes}, Delim: [${displayDelim}]`);
+            els.canvas.width = config.cols; els.canvas.height = config.rows;
+            els.colorbar.width=1; els.colorbar.height=256;
+            const cbImg = els.colorbar.getContext('2d').createImageData(1, 256);
+            for(let y=0; y<256; y++) {
+                const c = getHeatmapColor((1-y/256)*config.maxVal, config.maxVal);
+                const i=y*4; cbImg.data[i]=c[0]; cbImg.data[i+1]=c[1]; cbImg.data[i+2]=c[2]; cbImg.data[i+3]=255;
+            }
+            els.colorbar.getContext('2d').putImageData(cbImg, 0,0);
+            resizeUiCanvas();
+            log('system', 'Config Applied');
         }
 
-        // --- Serial Logic ---
-
-        async function connectSerial() {
-            if (!navigator.serial) {
-                alert("Web Serial API not supported in this browser.");
-                return;
-            }
-
-            try {
-                const baud = parseInt(els.baudRate.value);
-                port = await navigator.serial.requestPort();
-                await port.open({ baudRate: baud });
-                
-                isConnected = true;
-                updateUI(true);
-                log('success', `Connected @ ${baud} baud`);
-                
-                readLoop();
-                drawLoop(); // Start animation loop
-            } catch (err) {
-                console.error(err);
-                log('error', `Connection Failed: ${err.message}`);
-            }
-        }
-
-        async function disconnectSerial() {
-            // CRITICAL: Set connected to false FIRST to stop the readLoop from re-locking the port
-            isConnected = false;
-            updateUI(false); 
-
-            if (reader) {
-                await reader.cancel();
-                reader = null;
-            }
-            if (port) {
-                await port.close();
-                port = null;
-            }
-            
-            log('system', 'Disconnected');
-        }
-
-        async function readLoop() {
-            while (port && port.readable && isConnected) {
-                try {
-                    reader = port.readable.getReader();
-                    while (true) {
-                        const { value, done } = await reader.read();
-                        if (done) break;
-                        if (value) {
-                            processIncomingChunk(value);
-                        }
-                    }
-                } catch (error) {
-                    // Only log error if we didn't intentionally disconnect
-                    if (isConnected) {
-                        log('error', `Read Error: ${error}`);
-                    }
-                } finally {
-                    if (reader) {
-                        reader.releaseLock();
-                    }
-                }
-            }
-        }
-
-        // --- Protocol Parsing ---
-        
-        function findDelimiterIndex(buffer, delimiter, fromIndex) {
-            if (delimiter.length === 0) return -1;
-            for (let i = fromIndex; i <= buffer.length - delimiter.length; i++) {
-                let match = true;
-                for (let j = 0; j < delimiter.length; j++) {
-                    if (buffer[i + j] !== delimiter[j]) {
-                        match = false;
-                        break;
-                    }
-                }
-                if (match) return i;
-            }
-            return -1;
-        }
-
-        function processIncomingChunk(chunk) {
-            // 1. Append new chunk to existing buffer
-            const newBuffer = new Uint8Array(inputBuffer.length + chunk.length);
-            newBuffer.set(inputBuffer);
-            newBuffer.set(chunk, inputBuffer.length);
-            inputBuffer = newBuffer;
-
-            els.debugBuf.innerText = inputBuffer.length;
-            
-            // Expected packet size
-            const expectedSize = 7 + (2 * config.numNodes);
-
-            // SAFETY & DEBUG: Buffer Bloat Check
-            if (inputBuffer.length > expectedSize * 4 && !debugLogCooldown) {
-                // Hex dump the first 16 bytes to help user debug protocol mismatch
-                const hexDump = Array.from(inputBuffer.slice(0, 16))
-                    .map(b => b.toString(16).padStart(2,'0').toUpperCase())
-                    .join(' ');
-                
-                const delimHex = config.delimiter.map(b => b.toString(16).toUpperCase()).join(' ');
-                log('error', `Buffer Bloat! First 16 bytes: [${hexDump}]... Looking for '${delimHex}'. CHECK BAUD RATE.`);
-                
-                debugLogCooldown = true;
-                setTimeout(() => debugLogCooldown = false, 2000);
-            }
-            
-            // Hard Limit to prevent browser crash
-            if (inputBuffer.length > 200000) {
-                 log('error', 'Buffer Overflow (>200kb). Cleared. Baud Rate wrong?');
-                 inputBuffer = new Uint8Array(0);
-                 return;
-            }
-
-            // 2. Process all complete packets in buffer
-            let searchIndex = 0;
-            while (true) {
-                const delimIdx = findDelimiterIndex(inputBuffer, config.delimiter, searchIndex);
-                
-                if (delimIdx === -1) {
-                    // Keep remainder
-                    if (searchIndex > 0) {
-                        inputBuffer = inputBuffer.slice(searchIndex);
-                    }
-                    break;
-                }
-
-                // Packet is data BEFORE the delimiter
-                const packetBytes = inputBuffer.slice(searchIndex, delimIdx);
-                
-                parsePacket(packetBytes);
-                
-                // Move search forward past delimiter
-                searchIndex = delimIdx + config.delimiter.length;
-            }
-        }
-
-        function parsePacket(bytes) {
-            // Expected: <B + <H + <H*numNodes + <I
-            const expectedSize = 7 + (2 * config.numNodes);
-            
-            if (bytes.length !== expectedSize) {
-                // Occasional error logging
-                if (Math.random() < 0.05) {
-                    log('error', `Bad Pkt Size: ${bytes.length} (Exp: ${expectedSize})`);
-                    els.debugSize.innerText = bytes.length; 
-                }
-                return;
-            }
-
-            try {
-                const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-                let offset = 0;
-                
-                const sendId = dv.getUint8(offset); offset += 1;
-                const startIdx = dv.getUint16(offset, true); offset += 2;
-
-                const readings = [];
-                for (let i = 0; i < config.numNodes; i++) {
-                    readings.push(dv.getUint16(offset, true));
-                    offset += 2;
-                }
-
-                const packetNum = dv.getUint32(offset, true);
-                
-                updateHeatmapModel(startIdx, readings);
-                
-                packetCount++;
-                els.pkts.innerText = packetCount;
-
-            } catch (e) {
-                log('error', `Parse Except: ${e.message}`);
-            }
-        }
-
-        function updateHeatmapModel(startIdx, readings) {
-            const totalPixels = config.rows * config.cols;
-            for (let i = 0; i < readings.length; i++) {
-                const targetIdx = (startIdx + i) % totalPixels;
-                sensorData[targetIdx] = readings[i];
-            }
-        }
-
-        // --- Rendering ---
-
-        function drawLoop() {
-            if (!isConnected) {
-                 requestAnimationFrame(drawLoop);
-                 return;
-            }
-
-            const w = config.cols;
-            const h = config.rows;
-            const imageData = ctx.createImageData(w, h);
-            const data = imageData.data;
-
-            let maxValInFrame = 0;
-
-            for (let i = 0; i < sensorData.length; i++) {
-                const val = sensorData[i];
-                if (val > maxValInFrame) maxValInFrame = val;
-                
-                const [r, g, b] = getHeatmapColor(val, config.maxVal);
-
-                const pxIndex = i * 4;
-                data[pxIndex] = r;
-                data[pxIndex + 1] = g;
-                data[pxIndex + 2] = b;
-                data[pxIndex + 3] = 255;
-            }
-
-            ctx.putImageData(imageData, 0, 0);
-            els.maxValDisplay.innerText = maxValInFrame;
-            
-            frameCount++;
-            const now = performance.now();
-            if (now - lastFrameTime >= 1000) {
-                els.fps.innerText = frameCount;
-                frameCount = 0;
-                lastFrameTime = now;
-            }
-
-            requestAnimationFrame(drawLoop);
-        }
-
-        function drawColorbar() {
-            const h = els.colorbar.height;
-            const w = els.colorbar.width;
-            const imgData = cbCtx.createImageData(w, h);
-            const data = imgData.data;
-
-            for (let y = 0; y < h; y++) {
-                const normalized = 1 - (y / h);
-                const val = normalized * config.maxVal;
-                const [r, g, b] = getHeatmapColor(val, config.maxVal);
-                
-                const idx = y * 4;
-                data[idx] = r;
-                data[idx+1] = g;
-                data[idx+2] = b;
-                data[idx+3] = 255;
-            }
-            cbCtx.putImageData(imgData, 0, 0);
-        }
-
-        function getHeatmapColor(value, max) {
-            let normalized = value / max;
-            if (normalized > 1) normalized = 1;
-            if (normalized < 0) normalized = 0;
-
-            const hue = 240 - (normalized * 240);
-            return hslToRgb(hue / 360, 1.0, 0.5);
-        }
-
-        function hslToRgb(h, s, l) {
-            let r, g, b;
-            if (s === 0) {
-                r = g = b = l; 
-            } else {
-                const hue2rgb = (p, q, t) => {
-                    if (t < 0) t += 1;
-                    if (t > 1) t -= 1;
-                    if (t < 1/6) return p + (q - p) * 6 * t;
-                    if (t < 1/2) return q;
-                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-                    return p;
-                };
-                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-                const p = 2 * l - q;
-                r = hue2rgb(p, q, h + 1/3);
-                g = hue2rgb(p, q, h);
-                b = hue2rgb(p, q, h - 1/3);
-            }
-            return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-        }
-
-        // --- UI Helpers ---
-
-        function updateUI(connected) {
-            if (connected) {
-                els.connectBtn.classList.add('hidden');
-                els.disconnectBtn.classList.remove('hidden');
-                els.baudRate.disabled = true;
-                els.statusText.innerText = "Connected";
-                els.statusText.classList.replace('text-slate-500', 'text-green-400');
-                els.statusDot.classList.replace('bg-slate-600', 'bg-green-500');
-                els.statusDot.classList.add('animate-pulse');
-            } else {
-                els.connectBtn.classList.remove('hidden');
-                els.disconnectBtn.classList.add('hidden');
-                els.baudRate.disabled = false;
-                els.statusText.innerText = "Disconnected";
-                els.statusText.classList.replace('text-green-400', 'text-slate-500');
-                els.statusDot.classList.replace('bg-green-500', 'bg-slate-600');
-                els.statusDot.classList.remove('animate-pulse');
-            }
-        }
-
-        function log(type, msg) {
-            const div = document.createElement('div');
-            const color = type === 'error' ? 'text-red-400' : type === 'success' ? 'text-green-400' : 'text-slate-400';
-            const icon = type === 'error' ? '!' : type === 'success' ? '✓' : '>';
-            
-            if (els.log.children.length > 50) els.log.removeChild(els.log.firstChild);
-            div.innerHTML = `<span class="opacity-50 font-bold mr-2">${icon}</span><span class="${color}">${msg}</span>`;
-            els.log.appendChild(div);
-            els.log.scrollTop = els.log.scrollHeight;
-        }
-
-        // --- Startup ---
+        // --- Initialization ---
+        els.connectBtn.addEventListener('click', connectSerial);
+        els.disconnectBtn.addEventListener('click', disconnectSerial);
+        els.applyBtn.addEventListener('click', applyConfig);
         applyConfig();
-        resizeCanvas();
+
+
+        // --- TEMPLATES FOR MOCK AI GENERATION ---
+        
+        function getFlappyBirdTemplate() {
+            return `
+                <html>
+                <body style="margin:0; overflow:hidden; background:#87CEEB; font-family:sans-serif;">
+                    <div id="score" style="position:absolute; top:20px; left:20px; font-size:24px; color:white; font-weight:bold; z-index:10; text-shadow: 1px 1px 0 #000;">Distance: 0</div>
+                    <div style="position:absolute; bottom:20px; width:100%; text-align:center; color:white; font-weight:bold; text-shadow: 1px 1px 0 #000;">Press to Dive (Heavy Gravity)</div>
+                    <div style="position:absolute; right:20px; top:50%; transform:translateY(-50%); width:30px; height:200px; background:rgba(0,0,0,0.3); border:2px solid white; border-radius:15px; overflow:hidden;">
+                        <div id="gravity-fill" style="width:100%; height:0%; background:#ef4444; position:absolute; bottom:0;"></div>
+                    </div>
+                    <div style="position:absolute; right:60px; top:50%; transform:translateY(-50%) rotate(-90deg); color:white; font-weight:bold; text-shadow: 1px 1px 0 #000; white-space:nowrap;">GRAVITY</div>
+                    <canvas id="game"></canvas>
+                    <script>
+                        const canvas = document.getElementById('game');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = window.innerWidth;
+                        canvas.height = window.innerHeight;
+
+                        // Physics
+                        let bird = { x: 100, y: 200, vx: 5, vy: 0, r: 15 };
+                        let camX = 0;
+                        let pressure = 0; // 0.0 to 1.0
+                        let baseline = null;
+                        
+                        // Terrain
+                        const terrain = [];
+                        const segmentW = 30;
+                        
+                        function generateTerrain(startX, count) {
+                            for(let i=0; i<count; i++) {
+                                const x = startX + i * segmentW;
+                                // Sine waves for hills
+                                const y = canvas.height/2 + Math.sin(x * 0.005) * 150 + Math.sin(x * 0.01) * 50;
+                                terrain.push({x, y});
+                            }
+                        }
+                        generateTerrain(0, 200);
+
+                        window.addEventListener('message', (event) => {
+                            if(event.data.type !== 'sensor_update') return;
+                            const d = event.data;
+                            const raw = d.regions['index'] ? d.regions['index'].avg : d.stats.avg;
+                            
+                            // Calibration: Set baseline on first frame or if reading drifts higher (lighter)
+                            if (baseline === null || raw > baseline) baseline = raw;
+                            
+                            // Normalize 0..1 relative to baseline
+                            // baseline = 0 pressure (gravity 0)
+                            const norm = baseline > 0 ? Math.max(0, Math.min(1, (baseline - raw) / baseline)) : 0;
+                            pressure = norm;
+                        });
+
+                        function update() {
+                            // Gravity: 0 at baseline, increases with pressure
+                            const g = pressure * 0.9;
+                            bird.vy += g;
+                            
+                            bird.x += bird.vx;
+                            bird.y += bird.vy;
+                            
+                            // Friction / Air Resistance
+                            bird.vx *= 0.995;
+                            if(bird.vx < 3) bird.vx = 3; // Min speed
+
+                            // Collision
+                            // Fix: Adjust index relative to the sliding window of terrain segments
+                            const tIdx = Math.floor((bird.x - terrain[0].x) / segmentW);
+                            if(tIdx >= 0 && tIdx < terrain.length - 1) {
+                                const p1 = terrain[tIdx];
+                                const p2 = terrain[tIdx+1];
+                                const ratio = (bird.x - p1.x) / segmentW;
+                                const groundY = p1.y + (p2.y - p1.y) * ratio;
+                                
+                                if(bird.y + bird.r > groundY) {
+                                    bird.y = groundY - bird.r;
+                                    
+                                    // Slope calculation
+                                    const slope = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                                    
+                                    // Redirect velocity along slope
+                                    const speed = Math.sqrt(bird.vx*bird.vx + bird.vy*bird.vy);
+                                    bird.vx = Math.cos(slope) * speed;
+                                    bird.vy = Math.sin(slope) * speed;
+                                    
+                                    // If diving on a downslope, gain speed
+                                    if(pressure > 0.5 && Math.sin(slope) > 0) {
+                                        bird.vx += pressure * 0.5;
+                                    }
+                                }
+                            }
+                            
+                            camX = bird.x - 100;
+                            
+                            // Infinite Terrain
+                            if(terrain[terrain.length-1].x < camX + canvas.width + 500) {
+                                generateTerrain(terrain[terrain.length-1].x + segmentW, 50);
+                            }
+                            // Cleanup
+                            if(terrain[0].x < camX - 500) terrain.shift();
+                            
+                            document.getElementById('score').innerText = "Distance: " + Math.floor(bird.x/100);
+                            document.getElementById('gravity-fill').style.height = (pressure * 100) + "%";
+                        }
+
+                        function draw() {
+                            ctx.clearRect(0,0,canvas.width, canvas.height);
+                            ctx.save();
+                            ctx.translate(-camX, 0);
+                            
+                            // Draw Terrain
+                            ctx.fillStyle = '#4ade80';
+                            ctx.beginPath();
+                            ctx.moveTo(camX, canvas.height);
+                            for(let p of terrain) {
+                                if(p.x > camX - 100 && p.x < camX + canvas.width + 100) ctx.lineTo(p.x, p.y);
+                            }
+                            ctx.lineTo(camX + canvas.width, canvas.height);
+                            ctx.fill();
+                            
+                            // Bird
+                            ctx.translate(bird.x, bird.y);
+                            ctx.rotate(Math.atan2(bird.vy, bird.vx));
+                            ctx.fillStyle = pressure > 0.5 ? '#ef4444' : '#facc15';
+                            ctx.beginPath(); ctx.arc(0,0, bird.r, 0, Math.PI*2); ctx.fill();
+                            
+                            // Eye
+                            ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(5, -5, 2, 0, Math.PI*2); ctx.fill();
+                            
+                            ctx.restore();
+                            requestAnimationFrame(function() { update(); draw(); });
+                        }
+                        draw();
+                    <\/script>
+                </body>
+                </html>
+            `;
+        }
+
+        function getPaintTemplate() {
+            return `
+                <html>
+                <body style="margin:0; overflow:hidden; background:#222; color:white; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                    <h3 style="margin:10px">Finger Painter</h3>
+                    <p style="font-size:12px; color:#888">Mouse to move, 'Index' Region Pressure to paint</p>
+                    <canvas id="c" style="border:1px solid #444; background:black; cursor:crosshair;"></canvas>
+                    <script>
+                        const canvas = document.getElementById('c');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = 400; canvas.height = 300;
+
+                        let sensorState = { pressure: 0 };
+                        let mouse = { x: 0, y: 0, down: false };
+
+                        canvas.addEventListener('mousedown', e => { mouse.down = true; mouse.x = e.offsetX; mouse.y = e.offsetY; });
+                        canvas.addEventListener('mouseup', () => mouse.down = false);
+                        canvas.addEventListener('mousemove', e => {
+                            if(!mouse.down) return;
+                            
+                            ctx.lineWidth = Math.max(1, sensorState.pressure / 100);
+                            ctx.lineCap = 'round';
+                            ctx.strokeStyle = \`hsl(\${sensorState.pressure / 10}, 80%, 60%)\`;
+                            
+                            ctx.beginPath(); ctx.moveTo(mouse.x, mouse.y); ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke();
+                            mouse.x = e.offsetX; mouse.y = e.offsetY;
+                        });
+
+                        window.addEventListener('message', (event) => {
+                            if(event.data.type !== 'sensor_update') return;
+                            const d = event.data;
+                            const raw = d.regions['index'] ? d.regions['index'].avg : d.config.maxVal;
+                            sensorState.pressure = Math.max(0, d.config.maxVal - raw);
+                        });
+                    <\/script>
+                </body>
+                </html>
+            `;
+        }
+        
+        function getDebugTemplate() {
+            return `<html><body style='color:white; font-family:monospace; background:#111; padding:20px;'><h3>Waiting for data...</h3><div id='out'></div><script>window.addEventListener('message', e => { if(e.data.type==='sensor_update') document.getElementById('out').innerText = JSON.stringify(e.data.stats, null, 2); });<\/script></body></html>`;
+        }
 
     </script>
 </body>
