@@ -98,6 +98,21 @@
                 </div>
 
                 <div class="space-y-3">
+                    <h2 class="text-xs uppercase text-slate-500 font-bold tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-circle-dot text-slate-600"></i> Record
+                    </h2>
+                    <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 space-y-2">
+                        <div class="flex justify-between text-[10px] font-mono">
+                            <span class="text-slate-400">Frames: <span id="rec-frame-count">0</span></span>
+                            <span id="rec-status" class="text-slate-600">Idle</span>
+                        </div>
+                        <button id="record-btn" class="w-full py-2 px-4 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-circle text-red-400"></i> START RECORDING
+                        </button>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
                      <h2 class="text-xs uppercase text-slate-500 font-bold tracking-wider flex items-center gap-2">
                         <i class="fa-solid fa-gears text-slate-600"></i> Config
                     </h2>
@@ -193,6 +208,14 @@
         let regions = []; // {x,y,w,h,label}
         let dragStart = null;
 
+        // --- Recording ---
+        let isRecording = false;
+        let recordedFrames = [];
+        let recordedTimestamps = [];
+        let recordStartTime = 0;
+        let recordSampleCounter = 0; // cumulative values received since last snapshot
+        let hdf5Mod = null; // cached h5wasm module
+
         // --- DOM ---
         const els = {
             // Serial Controls
@@ -227,6 +250,11 @@
             cfgCols: document.getElementById('cfg-cols'),
             cfgNodes: document.getElementById('cfg-nodes'),
             applyBtn: document.getElementById('apply-config'),
+
+            // Recording
+            recordBtn: document.getElementById('record-btn'),
+            recFrameCount: document.getElementById('rec-frame-count'),
+            recStatus: document.getElementById('rec-status'),
         };
 
         const ctx = els.canvas.getContext('2d');
@@ -463,9 +491,24 @@
         function parsePacket(bytes) {
             const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
             const startIdx = dv.getUint16(1, true);
+
             for(let i=0; i<config.numNodes; i++) {
                 sensorData[(startIdx + i) % (config.rows*config.cols)] = dv.getUint16(3 + (i*2), true);
             }
+
+            // Snapshot once per full grid worth of received values.
+            // Using a running counter rather than startIdx, because with numNodes=120
+            // and grid=256, startIdx only returns to 0 every lcm(120,256)/120 = 32 packets.
+            if (isRecording) {
+                recordSampleCounter += config.numNodes;
+                if (recordSampleCounter >= config.rows * config.cols) {
+                    recordSampleCounter -= config.rows * config.cols;
+                    recordedFrames.push(new Float32Array(sensorData));
+                    recordedTimestamps.push(Date.now());
+                    els.recFrameCount.innerText = recordedFrames.length;
+                }
+            }
+
             packetCount++;
             els.pkts.innerText = packetCount;
         }
@@ -601,6 +644,103 @@
         els.applyBtn.addEventListener('click', applyConfig);
         applyConfig();
 
+        els.recordBtn.addEventListener('click', async () => {
+            if (!isRecording) {
+                isRecording = true;
+                recordedFrames = [];
+                recordedTimestamps = [];
+                recordStartTime = performance.now();
+                recordSampleCounter = 0;
+                els.recordBtn.innerHTML = '<i class="fa-solid fa-stop"></i> STOP & SAVE';
+                els.recordBtn.className = 'w-full py-2 px-4 bg-red-700 hover:bg-red-600 text-white text-xs font-bold rounded transition-all flex items-center justify-center gap-2';
+                els.recStatus.textContent = 'Recording...';
+                els.recStatus.className = 'text-[10px] text-red-400 font-mono animate-pulse';
+                log('system', 'Recording started');
+            } else {
+                isRecording = false;
+                const frames = recordedFrames.splice(0);
+                const timestamps = recordedTimestamps.splice(0);
+                els.recordBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+                els.recordBtn.disabled = true;
+                els.recStatus.textContent = 'Saving...';
+                els.recStatus.className = 'text-[10px] text-indigo-400 font-mono';
+                try {
+                    await saveAsHDF5(frames, timestamps);
+                    log('success', `Saved ${frames.length} frames as HDF5`);
+                } catch (e) {
+                    log('error', 'HDF5 save failed: ' + e.message);
+                }
+                els.recordBtn.disabled = false;
+                els.recordBtn.innerHTML = '<i class="fa-solid fa-circle text-red-400"></i> START RECORDING';
+                els.recordBtn.className = 'w-full py-2 px-4 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded transition-all flex items-center justify-center gap-2';
+                els.recStatus.textContent = 'Idle';
+                els.recStatus.className = 'text-[10px] text-slate-600 font-mono';
+                els.recFrameCount.textContent = '0';
+            }
+        });
+
+
+        // --- HDF5 Recording Save ---
+        async function saveAsHDF5(frames, timestamps) {
+            const fc = frames.length;
+            if (fc === 0) throw new Error('No frames recorded');
+
+            const numSensors = config.rows * config.cols;
+
+            // Flat float32 pressure array: shape (fc, numSensors)
+            const pressureFlat = new Float32Array(fc * numSensors);
+            for (let i = 0; i < fc; i++) {
+                const src = frames[i];
+                const offset = i * numSensors;
+                for (let j = 0; j < numSensors; j++) {
+                    pressureFlat[offset + j] = src[j] !== undefined ? src[j] : 0;
+                }
+            }
+
+            // Timestamps as Unix seconds (float64)
+            const tsArray = new Float64Array(fc);
+            for (let i = 0; i < fc; i++) tsArray[i] = timestamps[i] / 1000;
+
+            // Load h5wasm once and cache { File, FS }
+            if (!hdf5Mod) {
+                const mod = await import('https://cdn.jsdelivr.net/npm/h5wasm@latest/dist/esm/hdf5_hl.js');
+                // Named exports are the correct form; fall back to default if needed
+                const h5 = mod.File ? mod : (mod.default ?? mod);
+                await h5.ready;
+                hdf5Mod = { File: h5.File, FS: h5.FS };
+            }
+
+            const { File, FS } = hdf5Mod;
+            const filename = '/tactile_' + Date.now() + '.h5';
+            const f = new File(filename, 'w');
+
+            // h5wasm >= 0.7 requires the object-form API for create_dataset.
+            // Positional args cause the TypedArray to land in the options slot,
+            // making data=undefined and triggering "unguessable type for data".
+            // Schema matches tactile_reading():
+            //   frame_count[0]  → number of valid frames
+            //   ts[:fc]         → Unix timestamps in seconds (float64)
+            //   pressure[:fc]   → float32 array, shape (fc, rows*cols)
+            f.create_dataset({ name: 'frame_count', data: new Int32Array([fc]), shape: [1] });
+            f.create_dataset({ name: 'ts', data: tsArray, shape: [fc] });
+            f.create_dataset({ name: 'pressure', data: pressureFlat, shape: [fc, config.rows, config.cols] });
+
+            f.close();
+
+            // Read bytes from Emscripten virtual FS and download
+            const fileData = FS.readFile(filename);
+            FS.unlink(filename);
+
+            const blob = new Blob([fileData], { type: 'application/x-hdf5' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename.slice(1); // strip leading '/'
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
 
         // --- TEMPLATES FOR MOCK AI GENERATION ---
         
