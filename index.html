@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tactile AI Workbench</title>
+    <title>Tactile Workbench</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
     <style>
         .log-scroll::-webkit-scrollbar { width: 6px; }
         .log-scroll::-webkit-scrollbar-track { background: #1f2937; }
@@ -25,7 +26,7 @@
                     <i class="fa-solid fa-microchip text-white text-lg"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold text-white tracking-wide">Tactile AI Workbench</h1>
+                    <h1 class="text-lg font-bold text-white tracking-wide">Tactile Workbench</h1>
                     <p class="text-xs text-slate-400">Sensor-to-Code Pipeline</p>
                 </div>
             </div>
@@ -75,25 +76,82 @@
                     <h2 class="text-xs uppercase text-slate-500 font-bold tracking-wider flex items-center gap-2">
                         <i class="fa-solid fa-plug text-slate-600"></i> Connection
                     </h2>
-                    
-                    <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 space-y-3">
-                        <div>
-                            <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1">Baud Rate</label>
-                            <select id="baud-rate" class="w-full bg-slate-800 border border-slate-600 text-white text-xs rounded p-2 outline-none">
-                                <option value="9600">9600</option>
-                                <option value="115200">115200</option>
-                                <option value="250000" selected>250000</option>
-                                <option value="500000">500000</option>
-                                <option value="2000000">2000000</option>
-                            </select>
-                        </div>
-                        
+
+                    <!-- Sub-tabs -->
+                    <div class="flex gap-1 bg-slate-900/50 p-1 rounded-lg border border-slate-700/50">
+                        <button id="tab-transmitter" class="flex-1 py-1.5 text-[10px] font-bold rounded bg-slate-700 text-white transition-colors">
+                            <i class="fa-solid fa-tower-broadcast mr-1"></i>Transmitter
+                        </button>
+                        <button id="tab-receiver" class="flex-1 py-1.5 text-[10px] font-bold rounded text-slate-500 hover:text-slate-300 transition-colors">
+                            <i class="fa-solid fa-satellite-dish mr-1"></i>Receiver
+                        </button>
+                    </div>
+
+                    <!-- Transmitter Panel -->
+                    <div id="panel-transmitter" class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 space-y-3">
                         <button id="connect-btn" class="w-full py-2 px-4 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded transition-all flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-link"></i> CONNECT SERIAL
+                            <i class="fa-solid fa-link"></i> CONNECT
                         </button>
                         <button id="disconnect-btn" class="hidden w-full py-2 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded flex items-center justify-center gap-2">
                             <i class="fa-solid fa-unlink"></i> DISCONNECT
                         </button>
+
+                        <!-- Gain controls — visible when connected -->
+                        <div id="gain-controls" class="hidden space-y-2 pt-2 border-t border-slate-700/50">
+                            <div class="flex items-center justify-between">
+                                <label class="text-[10px] text-slate-400 uppercase font-bold">Gain</label>
+                                <span id="gain-display" class="text-xs font-mono text-indigo-300">--</span>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <button id="gain-dec" class="w-8 h-7 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded flex items-center justify-center shrink-0">−</button>
+                                <input type="number" id="gain-input" class="flex-1 min-w-0 bg-slate-800 border border-slate-600 text-white text-xs rounded p-1.5 outline-none text-center" placeholder="step">
+                                <button id="gain-set" class="px-2 h-7 bg-indigo-700 hover:bg-indigo-600 text-white text-[10px] font-bold rounded shrink-0">SET</button>
+                                <button id="gain-inc" class="w-8 h-7 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded flex items-center justify-center shrink-0">+</button>
+                            </div>
+                        </div>
+
+                        <!-- Mode toggle — visible when connected -->
+                        <div id="mode-control" class="hidden space-y-1">
+                            <div class="flex items-center justify-between">
+                                <label class="text-[10px] text-slate-400 uppercase font-bold">Transmission Mode</label>
+                                <button id="refresh-config-btn" class="text-[10px] text-slate-500 hover:text-slate-300 px-1" title="Re-fetch config from device">↺</button>
+                            </div>
+                            <button id="toggle-mode-btn" class="w-full py-2 px-4 bg-slate-700 text-white text-xs font-bold rounded flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-question"></i> UNKNOWN
+                            </button>
+                        </div>
+
+                        <div class="border-t border-slate-700/50 pt-2 space-y-2">
+                            <label class="block text-[10px] text-slate-400 uppercase font-bold">Firmware</label>
+                            <esp-web-install-button manifest="transmitter_manifest.json">
+                                <button slot="activate" class="w-full py-2 px-4 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded transition-colors flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-microchip"></i> FLASH FIRMWARE
+                                </button>
+                            </esp-web-install-button>
+                        </div>
+                    </div>
+
+                    <!-- Receiver Panel -->
+                    <div id="panel-receiver" class="hidden bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 space-y-3">
+                        <button id="receiver-connect-btn" class="w-full py-2 px-4 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-link"></i> CONNECT
+                        </button>
+                        <button id="receiver-disconnect-btn" class="hidden w-full py-2 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-unlink"></i> DISCONNECT
+                        </button>
+                        <button id="pair-btn" disabled class="w-full py-2 px-4 bg-slate-800 text-slate-600 text-xs font-bold rounded flex items-center justify-center gap-2 cursor-not-allowed">
+                            <i class="fa-solid fa-link-slash"></i> PAIR WITH TRANSMITTER
+                        </button>
+
+                        <div class="border-t border-slate-700/50 pt-2 space-y-2">
+                        <label class="block text-[10px] text-slate-400 uppercase font-bold">Firmware</label>
+                        <p class="text-[10px] text-slate-500">Flash the receiver firmware via Web Serial. Connect the receiver device before clicking.</p>
+                        <esp-web-install-button manifest="receiver_manifest.json">
+                            <button slot="activate" class="w-full py-2 px-4 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded transition-colors flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-microchip"></i> FLASH FIRMWARE
+                            </button>
+                        </esp-web-install-button>
+                        </div>
                     </div>
                 </div>
 
@@ -200,13 +258,26 @@
 
         // --- Runtime ---
         let port, reader, isConnected = false;
-        let inputBuffer = new Uint8Array(0);
+        const txBuffer = { data: new Uint8Array(0) };
+        const rxBuffer = { data: new Uint8Array(0) };
+        let transmitterLineBuffer = '';
+        let receiverLineBuffer = '';
         let sensorData = new Float32Array(256).fill(0);
         let packetCount = 0;
         let lastFrameTime = performance.now();
         let frameCount = 0;
         let regions = []; // {x,y,w,h,label}
         let dragStart = null;
+
+        // --- Transmitter state ---
+        let potStep = null;
+        let transmitMode = null;
+        // Text accumulated from inter-packet segments (bytes between delimiters that aren't
+        // a valid packet). These can only be firmware text responses, never binary data.
+        const txText = { buf: '', depth: 0 };
+
+        // --- Receiver state ---
+        let receiverPort, receiverReader, isReceiverConnected = false;
 
         // --- Recording ---
         let isRecording = false;
@@ -221,7 +292,6 @@
             // Serial Controls
             connectBtn: document.getElementById('connect-btn'),
             disconnectBtn: document.getElementById('disconnect-btn'),
-            baudRate: document.getElementById('baud-rate'),
             statusText: document.getElementById('connection-status'),
             statusDot: document.getElementById('status-dot'),
             clearRegionsBtn: document.getElementById('clear-regions'),
@@ -255,6 +325,26 @@
             recordBtn: document.getElementById('record-btn'),
             recFrameCount: document.getElementById('rec-frame-count'),
             recStatus: document.getElementById('rec-status'),
+
+            // Transmitter controls
+            gainControls: document.getElementById('gain-controls'),
+            gainDisplay: document.getElementById('gain-display'),
+            gainInput: document.getElementById('gain-input'),
+            gainDec: document.getElementById('gain-dec'),
+            gainInc: document.getElementById('gain-inc'),
+            gainSet: document.getElementById('gain-set'),
+            modeControl: document.getElementById('mode-control'),
+            toggleModeBtn: document.getElementById('toggle-mode-btn'),
+            refreshConfigBtn: document.getElementById('refresh-config-btn'),
+            tabTransmitter: document.getElementById('tab-transmitter'),
+            tabReceiver: document.getElementById('tab-receiver'),
+            panelTransmitter: document.getElementById('panel-transmitter'),
+            panelReceiver: document.getElementById('panel-receiver'),
+
+            // Receiver controls
+            receiverConnectBtn: document.getElementById('receiver-connect-btn'),
+            receiverDisconnectBtn: document.getElementById('receiver-disconnect-btn'),
+            pairBtn: document.getElementById('pair-btn'),
         };
 
         const ctx = els.canvas.getContext('2d');
@@ -428,19 +518,124 @@
             if (!navigator.serial) return alert("Web Serial not supported");
             try {
                 port = await navigator.serial.requestPort();
-                await port.open({ baudRate: parseInt(els.baudRate.value) });
+                await port.open({ baudRate: 250000 });
                 isConnected = true;
                 updateUI(true);
                 readLoop();
                 drawLoop();
+                // Let the device settle, then fetch current config (gain + mode)
+                setTimeout(() => writeSerial('getConfig\n'), 300);
             } catch (err) { log('error', err.message); }
         }
-        
+
         async function disconnectSerial() {
             isConnected = false;
             updateUI(false);
             if (reader) await reader.cancel();
             if (port) await port.close();
+        }
+
+        async function connectReceiver() {
+            if (!navigator.serial) return alert("Web Serial not supported");
+            try {
+                receiverPort = await navigator.serial.requestPort();
+                await receiverPort.open({ baudRate: 250000 });
+                isReceiverConnected = true;
+                els.receiverConnectBtn.classList.add('hidden');
+                els.receiverDisconnectBtn.classList.remove('hidden');
+                updatePairBtn();
+                log('system', 'Receiver connected');
+                readLoopReceiver();
+                if (!isConnected) drawLoop();
+            } catch (err) { log('error', err.message); }
+        }
+
+        async function disconnectReceiver() {
+            isReceiverConnected = false;
+            els.receiverConnectBtn.classList.remove('hidden');
+            els.receiverDisconnectBtn.classList.add('hidden');
+            updatePairBtn();
+            log('system', 'Receiver disconnected');
+            if (receiverReader) await receiverReader.cancel();
+            if (receiverPort) await receiverPort.close();
+        }
+
+        async function readLoopReceiver() {
+            while (receiverPort.readable && isReceiverConnected) {
+                try {
+                    receiverReader = receiverPort.readable.getReader();
+                    while (true) {
+                        const { value, done } = await receiverReader.read();
+                        if (done) break;
+                        if (value) processChunkReceiver(value);
+                    }
+                } catch (e) { log('error', e); }
+                finally { receiverReader.releaseLock(); }
+            }
+        }
+
+        async function writeSerial(text) {
+            if (!port || !isConnected || !port.writable) {
+                log('error', `[tx] blocked — transmitter not connected`);
+                return;
+            }
+            log('system', `[tx] ${text.trimEnd()}`);
+            const writer = port.writable.getWriter();
+            try {
+                await writer.write(new TextEncoder().encode(text));
+            } catch(e) {
+                log('error', `Serial write failed: ${e.message}`);
+            } finally {
+                writer.releaseLock();
+            }
+        }
+
+        function handleTextResponse(line) {
+            // getPot response: "Pot step: 122 (1968.50 ohms)"
+            const potMatch = line.match(/Pot step:\s*(\d+)/i);
+            if (potMatch) {
+                potStep = parseInt(potMatch[1]);
+                updateGainDisplay();
+                return;
+            }
+            // getConfig response: JSON (may have leading garbage — try each '{"' position)
+            let searchFrom = 0;
+            while (true) {
+                const jsonStart = line.indexOf('{"', searchFrom);
+                if (jsonStart === -1) break;
+                try {
+                    const cfg = JSON.parse(line.slice(jsonStart));
+                    if (typeof cfg.resistance === 'number') {
+                        potStep = cfg.resistance;
+                        updateGainDisplay();
+                    }
+                    if (typeof cfg.protocol === 'string') {
+                        transmitMode = cfg.protocol;
+                        updateModeDisplay();
+                    }
+                    break;
+                } catch (e) {
+                    searchFrom = jsonStart + 1;
+                }
+            }
+        }
+
+        function updateGainDisplay() {
+            els.gainDisplay.textContent = potStep !== null ? String(potStep) : '--';
+            if (potStep !== null) els.gainInput.value = potStep;
+        }
+
+        function updateModeDisplay() {
+            if (transmitMode === 'espnow') {
+                els.toggleModeBtn.innerHTML = '<i class="fa-solid fa-wifi"></i> WIRELESS';
+                els.toggleModeBtn.className = 'w-full py-2 px-4 bg-blue-700 hover:bg-blue-600 text-white text-xs font-bold rounded flex items-center justify-center gap-2';
+            } else if (transmitMode === 'serial') {
+                els.toggleModeBtn.innerHTML = '<i class="fa-solid fa-cable"></i> SERIAL';
+                els.toggleModeBtn.className = 'w-full py-2 px-4 bg-amber-700 hover:bg-amber-600 text-white text-xs font-bold rounded flex items-center justify-center gap-2';
+            } else {
+                els.toggleModeBtn.innerHTML = '<i class="fa-solid fa-question"></i> UNKNOWN';
+                els.toggleModeBtn.className = 'w-full py-2 px-4 bg-slate-700 text-white text-xs font-bold rounded flex items-center justify-center gap-2';
+            }
         }
 
         async function readLoop() {
@@ -457,34 +652,151 @@
             }
         }
 
-        function processChunk(chunk) {
-            const newBuf = new Uint8Array(inputBuffer.length + chunk.length);
-            newBuf.set(inputBuffer);
-            newBuf.set(chunk, inputBuffer.length);
-            inputBuffer = newBuf;
+        // Shared binary packet parser — both ports feed the same heatmap.
+        // Returns inter-packet segments: bytes between delimiters whose length doesn't
+        // match packetSize. These are guaranteed to be firmware text responses, not sensor data.
+        function processBinaryData(chunk, bufObj, logRejects = false) {
+            const newBuf = new Uint8Array(bufObj.data.length + chunk.length);
+            newBuf.set(bufObj.data);
+            newBuf.set(chunk, bufObj.data.length);
+            bufObj.data = newBuf;
 
             const packetSize = 7 + (2 * config.numNodes);
-            // Safety limit
-            if (inputBuffer.length > 200000) inputBuffer = new Uint8Array(0);
+            if (bufObj.data.length > 200000) bufObj.data = new Uint8Array(0);
 
+            const rejected = [];
             let searchIdx = 0;
-            while(true) {
-                // Find delimiter
+            while (true) {
                 let delimIdx = -1;
-                for(let i=searchIdx; i <= inputBuffer.length - config.delimiter.length; i++) {
-                    if(inputBuffer[i] === config.delimiter[0] && inputBuffer[i+1] === config.delimiter[1]) {
+                for (let i = searchIdx; i <= bufObj.data.length - config.delimiter.length; i++) {
+                    if (bufObj.data[i] === config.delimiter[0] && bufObj.data[i+1] === config.delimiter[1]) {
                         delimIdx = i; break;
                     }
                 }
-                
-                if(delimIdx === -1) {
-                    if(searchIdx > 0) inputBuffer = inputBuffer.slice(searchIdx);
+                if (delimIdx === -1) {
+                    if (searchIdx > 0) bufObj.data = bufObj.data.slice(searchIdx);
                     break;
                 }
-
-                const pkt = inputBuffer.slice(searchIdx, delimIdx);
-                if(pkt.length === packetSize) parsePacket(pkt);
+                const pkt = bufObj.data.slice(searchIdx, delimIdx);
+                if (pkt.length === packetSize) {
+                    parsePacket(pkt);
+                } else if (pkt.length > 0) {
+                    rejected.push(pkt);
+                    const preview = Array.from(pkt.slice(0, 40))
+                        .map(b => b >= 32 && b < 127 ? String.fromCharCode(b) : '·')
+                        .join('');
+                    if (logRejects) log('system', `[inter-pkt ${pkt.length}B] ${preview}`);
+                }
                 searchIdx = delimIdx + config.delimiter.length;
+            }
+            return rejected;
+        }
+
+        // Scan inter-packet segments for newline-terminated text and JSON/array values.
+        // Because these bytes come only from non-packet inter-delimiter gaps, there is no
+        // binary sensor data here — depth tracking on { } [ ] is safe.
+        function scanInterPacketText(segments, state, handler) {
+            for (const seg of segments) {
+                for (const b of seg) {
+                    if (b === 10 || b === 13) { // CR / LF
+                        if (state.depth === 0) {
+                            const line = state.buf.trim();
+                            state.buf = '';
+                            if (line.length > 0) handler(line);
+                        }
+                    } else if (b >= 32 && b < 127) { // printable ASCII
+                        state.buf += String.fromCharCode(b);
+                        if (b === 123 || b === 91) { // { [
+                            state.depth++;
+                        } else if ((b === 125 || b === 93) && state.depth > 0) { // } ]
+                            state.depth--;
+                            if (state.depth === 0 && (state.buf[0] === '{' || state.buf[0] === '[')) {
+                                handler(state.buf.trim());
+                                state.buf = '';
+                            }
+                        }
+                        if (state.buf.length > 4096) { state.buf = ''; state.depth = 0; }
+                    } else if (state.depth === 0) {
+                        // Non-printable byte outside a JSON value — discard accumulated garbage.
+                        state.buf = '';
+                    }
+                    // Non-printable byte inside JSON — skip (line noise).
+                }
+            }
+        }
+
+        // Transmitter port: binary data + text responses (getConfig, getPot).
+        function processChunk(chunk) {
+            txText.buf = ''; txText.depth = 0;
+            const rejected = processBinaryData(chunk, txBuffer, true);
+            scanInterPacketText(rejected, txText, handleTextResponse);
+            // Line accumulator handles text when no binary packets are present (wireless mode)
+            for (const b of chunk) {
+                if (b === 10 || b === 13) {
+                    const line = transmitterLineBuffer.trim();
+                    transmitterLineBuffer = '';
+                    if (line.length > 0) handleTextResponse(line);
+                } else if (b >= 32 && b < 127) {
+                    transmitterLineBuffer += String.fromCharCode(b);
+                    if (transmitterLineBuffer.length > 4096) transmitterLineBuffer = '';
+                }
+            }
+        }
+
+        // Receiver port: binary sensor packets (wireless mode) + text responses.
+        // processBinaryData handles packet extraction; line accumulator handles text
+        // independently so MAC responses work even before the first packet delimiter.
+        function processChunkReceiver(chunk) {
+            processBinaryData(chunk, rxBuffer);
+            for (const b of chunk) {
+                if (b === 10 || b === 13) {
+                    const line = receiverLineBuffer.trim();
+                    receiverLineBuffer = '';
+                    if (line.length > 0) handleReceiverResponse(line);
+                } else if (b >= 32 && b < 127) {
+                    receiverLineBuffer += String.fromCharCode(b);
+                    if (receiverLineBuffer.length > 4096) receiverLineBuffer = '';
+                }
+            }
+        }
+
+        function handleReceiverResponse(line) {
+            const arrStart = line.indexOf('[');
+            if (arrStart !== -1) {
+                try {
+                    const mac = JSON.parse(line.slice(arrStart));
+                    if (Array.isArray(mac) && mac.length === 6) {
+                        log('system', `Receiver MAC: [${mac.join(', ')}]`);
+                        writeSerial(`updateMacAddress:[${mac.join(',')}]\n`);
+                        log('success', 'Paired: MAC address sent to transmitter');
+                    }
+                } catch (e) { /* ignore garbage lines from binary packet bytes */ }
+            }
+        }
+
+        async function writeReceiverSerial(text) {
+            if (!receiverPort || !isReceiverConnected || !receiverPort.writable) {
+                log('error', `[rx-tx] blocked — receiver not connected`);
+                return;
+            }
+            log('system', `[rx-tx] ${text.trimEnd()}`);
+            const writer = receiverPort.writable.getWriter();
+            try {
+                await writer.write(new TextEncoder().encode(text));
+            } catch(e) {
+                log('error', `Receiver write failed: ${e.message}`);
+            } finally {
+                writer.releaseLock();
+            }
+        }
+
+        function updatePairBtn() {
+            const canPair = isConnected && isReceiverConnected;
+            els.pairBtn.disabled = !canPair;
+            if (canPair) {
+                els.pairBtn.className = 'w-full py-2 px-4 bg-violet-700 hover:bg-violet-600 text-white text-xs font-bold rounded transition-colors flex items-center justify-center gap-2 cursor-pointer';
+            } else {
+                els.pairBtn.className = 'w-full py-2 px-4 bg-slate-800 text-slate-600 text-xs font-bold rounded flex items-center justify-center gap-2 cursor-not-allowed';
             }
         }
 
@@ -515,7 +827,7 @@
 
         // --- Rendering Loop ---
         function drawLoop() {
-            if(!isConnected) { requestAnimationFrame(drawLoop); return; }
+            if(!isConnected && !isReceiverConnected) { requestAnimationFrame(drawLoop); return; }
 
             // 1. Draw Heatmap
             const w = config.cols, h = config.rows;
@@ -597,19 +909,27 @@
         };
 
         function updateUI(connected) {
-            if(connected) {
+            if (connected) {
                 els.connectBtn.classList.add('hidden');
                 els.disconnectBtn.classList.remove('hidden');
+                els.gainControls.classList.remove('hidden');
+                els.modeControl.classList.remove('hidden');
                 els.statusText.innerText = "Connected";
                 els.statusText.className = "text-sm font-medium text-green-400";
                 els.statusDot.className = "w-3 h-3 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]";
             } else {
                 els.connectBtn.classList.remove('hidden');
                 els.disconnectBtn.classList.add('hidden');
+                els.gainControls.classList.add('hidden');
+                els.modeControl.classList.add('hidden');
+                potStep = null; transmitMode = null;
+                updateGainDisplay();
+                updateModeDisplay();
                 els.statusText.innerText = "Disconnected";
                 els.statusText.className = "text-sm font-medium text-slate-500";
                 els.statusDot.className = "w-3 h-3 rounded-full bg-slate-600 shadow-none";
             }
+            updatePairBtn();
         }
         
         function log(type, msg) {
@@ -641,8 +961,66 @@
         // --- Initialization ---
         els.connectBtn.addEventListener('click', connectSerial);
         els.disconnectBtn.addEventListener('click', disconnectSerial);
+        els.receiverConnectBtn.addEventListener('click', connectReceiver);
+        els.receiverDisconnectBtn.addEventListener('click', disconnectReceiver);
+        els.pairBtn.addEventListener('click', async () => {
+            log('system', 'Requesting receiver MAC address...');
+            await writeReceiverSerial('getMacAddress\n');
+        });
         els.applyBtn.addEventListener('click', applyConfig);
         applyConfig();
+
+        // Gain controls
+        els.gainDec.addEventListener('click', async () => {
+            if (potStep === null) return;
+            potStep = Math.max(0, potStep - 1);
+            updateGainDisplay();
+            await writeSerial(`updatePot:${potStep}\n`);
+            await writeSerial('getPot\n');
+        });
+        els.gainInc.addEventListener('click', async () => {
+            if (potStep === null) return;
+            potStep = potStep + 1;
+            updateGainDisplay();
+            await writeSerial(`updatePot:${potStep}\n`);
+            await writeSerial('getPot\n');
+        });
+        els.gainSet.addEventListener('click', async () => {
+            const val = parseInt(els.gainInput.value);
+            if (isNaN(val)) return;
+            potStep = Math.max(0, val);
+            updateGainDisplay();
+            await writeSerial(`updatePot:${potStep}\n`);
+            await writeSerial('getPot\n');
+        });
+        els.gainInput.addEventListener('keydown', e => { if (e.key === 'Enter') els.gainSet.click(); });
+
+        // Mode toggle
+        els.refreshConfigBtn.addEventListener('click', () => {
+            log('system', '[tx] getConfig (manual)');
+            writeSerial('getConfig\n');
+        });
+
+        els.toggleModeBtn.addEventListener('click', async () => {
+            await writeSerial('toggleMode\n');
+            log('system', 'Toggling mode — waiting for firmware...');
+            // Let the firmware settle then read back the actual new state.
+            setTimeout(() => writeSerial('getConfig\n'), 150);
+        });
+
+        // Connection sub-tabs
+        els.tabTransmitter.addEventListener('click', () => {
+            els.tabTransmitter.className = 'flex-1 py-1.5 text-[10px] font-bold rounded bg-slate-700 text-white transition-colors';
+            els.tabReceiver.className = 'flex-1 py-1.5 text-[10px] font-bold rounded text-slate-500 hover:text-slate-300 transition-colors';
+            els.panelTransmitter.classList.remove('hidden');
+            els.panelReceiver.classList.add('hidden');
+        });
+        els.tabReceiver.addEventListener('click', () => {
+            els.tabReceiver.className = 'flex-1 py-1.5 text-[10px] font-bold rounded bg-slate-700 text-white transition-colors';
+            els.tabTransmitter.className = 'flex-1 py-1.5 text-[10px] font-bold rounded text-slate-500 hover:text-slate-300 transition-colors';
+            els.panelReceiver.classList.remove('hidden');
+            els.panelTransmitter.classList.add('hidden');
+        });
 
         els.recordBtn.addEventListener('click', async () => {
             if (!isRecording) {

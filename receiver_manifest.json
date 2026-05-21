@@ -1,0 +1,12 @@
+{
+  "name": "WiReSens Receiver Firmware",
+  "version": "1.0.0",
+  "builds": [
+    {
+      "chipFamily": "ESP32",
+      "parts": [
+        { "path": "receiver_firmware.bin", "offset": 0 }
+      ]
+    }
+  ]
+}

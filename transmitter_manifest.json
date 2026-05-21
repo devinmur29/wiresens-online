@@ -1,0 +1,12 @@
+{
+  "name": "WiReSens Transmitter Firmware",
+  "version": "1.0.0",
+  "builds": [
+    {
+      "chipFamily": "ESP32",
+      "parts": [
+        { "path": "transmitter_firmware.bin", "offset": 0 }
+      ]
+    }
+  ]
+}
